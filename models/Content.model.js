@@ -27,10 +27,22 @@ const Content = sequelize.define(
       allowNull: false,
     },
 
+    allowBookmark: {
+  type: DataTypes.BOOLEAN,
+  allowNull: false,
+  defaultValue: true,
+},
+
+
+
     title: {
       type: DataTypes.STRING,
       allowNull: false,
     },
+
+    duration: DataTypes.INTEGER, // minutes
+pages: DataTypes.INTEGER,
+
 
     /**
      * video / assignment:

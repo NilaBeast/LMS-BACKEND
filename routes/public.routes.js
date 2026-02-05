@@ -43,4 +43,24 @@ router.get("/courses/:id", async (req, res) => {
   res.json(course);
 });
 
+router.get("/courses/:id/landing", async (req, res) => {
+  const course = await Course.findOne({
+    where: { id: req.params.id },
+    include: [Product],
+  });
+
+  if (!course || course.Product.status !== "published") {
+    return res.status(404).json({ message: "Not found" });
+  }
+
+  res.json({
+    id: course.id,
+    name: course.name,
+    description: course.description,
+    cover: course.coverImage,
+    pricing: course.pricing,
+  });
+});
+
+
 module.exports = router;

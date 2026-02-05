@@ -2,58 +2,68 @@ const Content = require("../models/Content.model");
 const { sequelize } = require("../config/db");
 
 /* ================= CREATE CONTENT ================= */
+
 exports.createContent = async (req, res) => {
   try {
-    const { chapterId } = req.params;
-    const { type, title, meta } = req.body;
-    const file = req.file;
+    const {
+      title,
+      type,
+      duration,
+      pages,
+      meta,
+      allowBookmark,
+    } = req.body;
 
-    if (!type || !title) {
-      return res.status(400).json({ message: "Type and title required" });
-    }
+    const chapterId = req.params.chapterId;
 
-    const lastOrder =
-      (await Content.max("order", { where: { chapterId } })) || 0;
+    /* GET LAST ORDER */
+    const last = await Content.findOne({
+      where: { chapterId },
+      order: [["order", "DESC"]],
+    });
 
-    let data;
+    const nextOrder = last ? last.order + 1 : 1;
 
-    // 🔹 FILE-BASED CONTENT
-    if (["video", "assignment"].includes(type)) {
-      if (!file) {
-        return res.status(400).json({ message: "File required" });
-      }
+    /* BUILD DATA */
+    let data = {};
 
-      data = {
-        url: file.path,         // Cloudinary URL
-        publicId: file.filename,
-        mime: file.mimetype,
-      };
-    }
-
-    // 🔹 JSON CONTENT
-    if (["quiz", "form", "text"].includes(type)) {
-      if (!meta) {
-        return res.status(400).json({ message: "Meta required" });
-      }
+    if (meta) {
       data = JSON.parse(meta);
     }
 
+    if (req.file) {
+      data.url = req.file.path;
+      data.publicId = req.file.filename;
+      data.mime = req.file.mimetype;
+    }
+
+    /* CREATE */
     const content = await Content.create({
       chapterId,
+      title,
       type,
-      title: title.trim(),
+
+      duration: Number(duration) || 0,
+      pages: Number(pages) || 0,
+
+      order: nextOrder,
+
+      allowBookmark:
+        allowBookmark === "false" ? false : true,
+
       data,
-      order: lastOrder + 1,
     });
 
-    res.status(201).json(content);
+    res.json(content);
+
   } catch (err) {
     console.error("CREATE CONTENT ERROR:", err);
-    res.status(500).json({ message: "Failed to create content" });
+    res.status(500).json({ message: "Create failed" });
   }
 };
 
 /* ================= GET BY CHAPTER ================= */
+
 exports.getContentsByChapter = async (req, res) => {
   try {
     const { chapterId } = req.params;
@@ -64,12 +74,13 @@ exports.getContentsByChapter = async (req, res) => {
     });
 
     res.json(contents);
-  } catch (err) {
+  } catch {
     res.status(500).json({ message: "Failed to load contents" });
   }
 };
 
 /* ================= REORDER ================= */
+
 exports.reorderContents = async (req, res) => {
   const transaction = await sequelize.transaction();
 
@@ -84,8 +95,10 @@ exports.reorderContents = async (req, res) => {
     }
 
     await transaction.commit();
+
     res.json({ message: "Contents reordered" });
-  } catch (err) {
+
+  } catch {
     await transaction.rollback();
     res.status(500).json({ message: "Failed to reorder contents" });
   }

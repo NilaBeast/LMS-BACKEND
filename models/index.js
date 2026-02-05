@@ -8,6 +8,7 @@ const CourseRoom = require("./CourseRoom.model");
 const RoomMessage = require("./RoomMessage.model");
 const Chapter = require("./Chapter.model");
 const Content = require("./Content.model");
+const Bookmark = require("./Bookmark.model");
 
 /* ================= BUSINESS ================= */
 User.hasMany(Business, { foreignKey: "userId" });
@@ -56,6 +57,12 @@ Enrollment.belongsTo(Course, { foreignKey: "courseId" });
 Course.hasMany(Enrollment, { foreignKey: "courseId" });
 User.hasMany(Enrollment, { foreignKey: "userId" });
 
+/*==================BOOKMARK================*/
+User.hasMany(Bookmark, { foreignKey: "userId" });
+Bookmark.belongsTo(User, { foreignKey: "userId" });
+
+Course.hasMany(Bookmark, { foreignKey: "courseId" });
+Bookmark.belongsTo(Course, { foreignKey: "courseId" });
 
 RoomMessage.belongsTo(User, { foreignKey: "userId" });
 
@@ -68,4 +75,5 @@ module.exports = {
   Enrollment,
   CourseRoom,
   RoomMessage,
+  Bookmark
 };

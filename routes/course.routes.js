@@ -10,6 +10,8 @@ const {
   getCourseById,
   updateCourse,
   deleteCourse,
+  getCourseMoreInfo,
+  updateCourseSettings,
 } = require("../controllers/course.controller");
 
 /* ================= COURSES ================= */
@@ -28,5 +30,11 @@ router.put("/:id", protect, upload.single("coverImage"), updateCourse);
 
 // DELETE
 router.delete("/product/:productId", protect, deleteCourse);
+
+router.get("/:id/more-info", protect, getCourseMoreInfo);
+
+router.patch("/:id/settings", protect, updateCourseSettings);
+
+
 
 module.exports = router;

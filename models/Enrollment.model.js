@@ -15,6 +15,11 @@ const Enrollment = sequelize.define(
       allowNull: false,
     },
 
+    expiresAt: {
+  type: DataTypes.DATE,
+},
+
+
     courseId: {
       type: DataTypes.UUID,
       allowNull: false,

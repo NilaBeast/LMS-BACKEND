@@ -60,6 +60,19 @@ const Course = sequelize.define("Course", {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   },
+
+  courseSettings: {
+  type: DataTypes.JSON,
+  defaultValue: {
+    enableBookmark: true,
+    enableExpiry: true,
+    enableRoom: true,
+    enableMail: true,
+    showDuration: true,
+    showPages: true,
+  },
+},
+
   
 
   roomConfig: {

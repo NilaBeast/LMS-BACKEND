@@ -3,6 +3,8 @@ const Course = require("../models/Course.model");
 const Coupon = require("../models/Coupon.model");
 const Business = require("../models/Business.model");
 const { sequelize } = require("../config/db");
+const mailer = require("../services/mail.service");
+const { emailLayout } = require("../utils/emailTemplate");
 
 /**
  * CREATE COURSE (MULTI-BUSINESS SAFE)
@@ -72,6 +74,8 @@ exports.createCourse = async (req, res) => {
       },
       { transaction }
     );
+
+    
 
     await transaction.commit();
 
@@ -274,3 +278,23 @@ exports.deleteCourse = async (req, res) => {
   }
 };
 
+exports.getCourseMoreInfo = async (req, res) => {
+  const course = await Course.findByPk(req.params.id);
+
+  res.json({
+    settings: course.courseSettings,
+    pricing: course.pricing,
+    room: course.hasRoom,
+    breakdown: course.pricingBreakdown,
+  });
+};
+
+exports.updateCourseSettings = async (req, res) => {
+  const course = await Course.findByPk(req.params.id);
+
+  course.courseSettings = req.body;
+
+  await course.save();
+
+  res.json(course.courseSettings);
+};

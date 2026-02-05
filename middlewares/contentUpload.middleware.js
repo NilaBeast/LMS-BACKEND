@@ -6,11 +6,16 @@ const storage = new CloudinaryStorage({
   cloudinary,
 
   params: async (req, file) => {
+
     let resourceType = "auto";
 
-    // 🔥 FORCE PDF AS IMAGE (for preview)
+    // Force video for video files
+    if (file.mimetype.startsWith("video/")) {
+      resourceType = "video";
+    }
+
     if (file.mimetype === "application/pdf") {
-      resourceType = "image";
+      resourceType = "raw";
     }
 
     return {
@@ -21,6 +26,11 @@ const storage = new CloudinaryStorage({
   },
 });
 
-const uploadContent = multer({ storage });
+const uploadContent = multer({
+  storage,
+  limits: {
+    fileSize: 500 * 1024 * 1024, // 500MB
+  },
+});
 
 module.exports = uploadContent;
