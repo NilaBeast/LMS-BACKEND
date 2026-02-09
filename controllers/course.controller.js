@@ -2,6 +2,7 @@ const Product = require("../models/Product.model");
 const Course = require("../models/Course.model");
 const Coupon = require("../models/Coupon.model");
 const Business = require("../models/Business.model");
+const Enrollment = require("../models/Enrollment.model");
 const { sequelize } = require("../config/db");
 const mailer = require("../services/mail.service");
 const { emailLayout } = require("../utils/emailTemplate");
@@ -22,7 +23,13 @@ exports.createCourse = async (req, res) => {
       viewBreakdown,
       hasRoom,
       roomConfig,
-      businessId, // 🔥 REQUIRED NOW
+      businessId,
+
+      // NEW
+      isLimited,
+      accessType,
+      expiryDate,
+      accessDays,
     } = req.body;
 
     if (!name || !pricingType || !pricing || !businessId) {
@@ -32,7 +39,6 @@ exports.createCourse = async (req, res) => {
     const parsedPricing =
       typeof pricing === "string" ? JSON.parse(pricing) : pricing;
 
-    // 🔒 Verify business belongs to user
     const business = await Business.findOne({
       where: {
         id: businessId,
@@ -46,7 +52,6 @@ exports.createCourse = async (req, res) => {
       return res.status(403).json({ message: "Invalid business access" });
     }
 
-    // ✅ CREATE PRODUCT
     const product = await Product.create(
       {
         businessId: business.id,
@@ -56,7 +61,6 @@ exports.createCourse = async (req, res) => {
       { transaction }
     );
 
-    // ✅ CREATE COURSE
     const course = await Course.create(
       {
         productId: product.id,
@@ -68,24 +72,32 @@ exports.createCourse = async (req, res) => {
         pricingBreakdown: pricingBreakdown
           ? JSON.parse(pricingBreakdown)
           : null,
-        viewBreakdown: viewBreakdown === "true" || viewBreakdown === true,
-        hasRoom: hasRoom === "true" || hasRoom === true,
+        viewBreakdown: viewBreakdown === "true",
+        hasRoom: hasRoom === "true",
+
         roomConfig: roomConfig ? JSON.parse(roomConfig) : null,
+
+        /* NEW */
+
+        isLimited: isLimited === "true",
+        accessType: isLimited === "true" ? accessType : null,
+        expiryDate: accessType === "fixed_date" ? expiryDate : null,
+        accessDays: accessType === "days" ? accessDays : null,
       },
       { transaction }
     );
-
-    
 
     await transaction.commit();
 
     res.status(201).json(course);
   } catch (err) {
     await transaction.rollback();
+
     console.error("CREATE COURSE ERROR:", err);
     res.status(500).json({ message: "Course creation failed" });
   }
 };
+
 
 /**
  * GET ALL MY COURSES (ALL BUSINESSES)
@@ -188,6 +200,11 @@ exports.updateCourse = async (req, res) => {
       pricingType,
       pricing,
       viewBreakdown,
+
+      isLimited,
+      accessType,
+      expiryDate,
+      accessDays,
     } = req.body;
 
     const parsedPricing =
@@ -217,24 +234,98 @@ exports.updateCourse = async (req, res) => {
       return res.status(404).json({ message: "Course not found" });
     }
 
+    /* ================= BASIC UPDATE ================= */
+
     course.name = name ?? course.name;
     course.description = description ?? course.description;
     course.pricingType = pricingType ?? course.pricingType;
     course.pricing = parsedPricing ?? course.pricing;
-    course.viewBreakdown =
-      viewBreakdown ?? course.viewBreakdown;
+    course.viewBreakdown = viewBreakdown ?? course.viewBreakdown;
 
     if (req.file) {
       course.coverImage = req.file.path;
     }
 
+    /* ================= ACCESS UPDATE ================= */
+
+    if (isLimited !== undefined) {
+
+      const limited = isLimited === "true" || isLimited === true;
+
+      course.isLimited = limited;
+
+      if (limited) {
+
+        course.accessType = accessType;
+
+        // FIXED DATE
+        if (accessType === "fixed_date") {
+          course.expiryDate = expiryDate;
+          course.accessDays = null;
+        }
+
+        // DAYS (Do NOT touch old enrollments)
+        if (accessType === "days") {
+          course.accessDays = accessDays;
+          course.expiryDate = null;
+        }
+
+      } else {
+        // Switch to unlimited
+        course.isLimited = false;
+        course.accessType = null;
+        course.expiryDate = null;
+        course.accessDays = null;
+      }
+    }
+
     await course.save();
+
+    /* ================= SYNC OLD ENROLLMENTS ================= */
+
+    // Only for FIXED DATE (everyone same expiry)
+    if (
+      isLimited !== undefined &&
+      course.isLimited &&
+      course.accessType === "fixed_date"
+    ) {
+      await Enrollment.update(
+        {
+          expiresAt: course.expiryDate,
+        },
+        {
+          where: { courseId: course.id },
+        }
+      );
+    }
+
+    // If admin removes limit → make unlimited
+    if (isLimited !== undefined && !course.isLimited) {
+      await Enrollment.update(
+        {
+          expiresAt: null,
+        },
+        {
+          where: { courseId: course.id },
+        }
+      );
+    }
+
+    /* ======================================================= */
+
     res.json(course);
+
   } catch (err) {
+
     console.error("UPDATE COURSE ERROR:", err);
-    res.status(500).json({ message: "Failed to update course" });
+
+    res.status(500).json({
+      message: "Failed to update course",
+    });
   }
 };
+
+
 
 /**
  * DELETE COURSE (BUSINESS SCOPED)

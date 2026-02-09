@@ -82,7 +82,7 @@ app.get("/", (req, res) => {
 
     // 3️⃣ Sync DB (DEV ONLY)
     // ⚠️ Use migrations in production
-    await sequelize.sync({force: true});
+    await sequelize.sync();
 
     // 4️⃣ Start server
     app.listen(PORT, "0.0.0.0", () => {

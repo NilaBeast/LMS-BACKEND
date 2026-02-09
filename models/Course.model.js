@@ -28,28 +28,9 @@ const Course = sequelize.define("Course", {
     allowNull: false,
   },
 
-  pricing: {
-    type: DataTypes.JSON,
-    /*
-      fixed: { price }
-      flexible: { min, max }
-      installment: {
-        bookingAmount,
-        installments: [{ amount, dueInDays }]
-      }
-    */
-  },
+  pricing: DataTypes.JSON,
 
-  pricingBreakdown: {
-    type: DataTypes.JSON,
-    /*
-      {
-        gstPercent: 18,
-        platformFeePercent: 5,
-        showBreakdown: true
-      }
-    */
-  },
+  pricingBreakdown: DataTypes.JSON,
 
   viewBreakdown: {
     type: DataTypes.BOOLEAN,
@@ -61,30 +42,43 @@ const Course = sequelize.define("Course", {
     defaultValue: false,
   },
 
+  /* ================= ACCESS CONTROL ================= */
+
+  isLimited: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+
+  accessType: {
+    type: DataTypes.ENUM("fixed_date", "days"),
+    allowNull: true,
+  },
+
+  expiryDate: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+
+  accessDays: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+
+  /* ================================================ */
+
   courseSettings: {
-  type: DataTypes.JSON,
-  defaultValue: {
-    enableBookmark: true,
-    enableExpiry: true,
-    enableRoom: true,
-    enableMail: true,
-    showDuration: true,
-    showPages: true,
-  },
-},
-
-  
-
-  roomConfig: {
     type: DataTypes.JSON,
-    /*
-      {
-        type: "chat",
-        allowFiles: true,
-        allowLinks: true
-      }
-    */
+    defaultValue: {
+      enableBookmark: true,
+      enableExpiry: true,
+      enableRoom: true,
+      enableMail: true,
+      showDuration: true,
+      showPages: true,
+    },
   },
+
+  roomConfig: DataTypes.JSON,
 }, {
   tableName: "courses",
   timestamps: true,

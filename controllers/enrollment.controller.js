@@ -10,7 +10,6 @@ const { emailLayout } = require("../utils/emailTemplate");
 exports.enrollCourse = async (req, res) => {
   try {
     const { courseId } = req.body;
-    const { accessDays, expiryDate } = req.body;
     const userId = req.user.id;
 
     let expiresAt = null;
@@ -19,16 +18,7 @@ exports.enrollCourse = async (req, res) => {
       return res.status(400).json({ message: "Course ID required" });
     }
 
-    if (accessDays) {
-  expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + accessDays);
-}
-
-if (expiryDate) {
-  expiresAt = new Date(expiryDate);
-}
-
-    // ✅ COURSE MUST BE PUBLISHED (PRODUCT.STATUS)
+    // ✅ COURSE MUST BE PUBLISHED
     const course = await Course.findOne({
       where: { id: courseId },
       include: [
@@ -46,6 +36,27 @@ if (expiryDate) {
         .json({ message: "Course not available" });
     }
 
+    /* =================================================
+       NEW: AUTO CALCULATE EXPIRY FROM COURSE SETTINGS
+    ================================================= */
+
+    if (course.isLimited) {
+
+      // Fixed Date
+      if (course.accessType === "fixed_date") {
+        expiresAt = course.expiryDate;
+      }
+
+      // Days from enrollment
+      if (course.accessType === "days") {
+        const d = new Date();
+        d.setDate(d.getDate() + course.accessDays);
+        expiresAt = d;
+      }
+    }
+
+    /* ================================================= */
+
     // ✅ Prevent duplicate enrollment
     const exists = await Enrollment.findOne({
       where: { userId, courseId },
@@ -57,49 +68,50 @@ if (expiryDate) {
 
     // ✅ Create enrollment
     await Enrollment.create({
-  userId,
-  courseId,
-  businessId: course.Product.businessId,
-  expiresAt,
-});
+      userId,
+      courseId,
+      businessId: course.Product.businessId,
+      expiresAt,
+    });
 
-//Send mail upon new course creation
-const html = emailLayout(
-  "Enrollment Successful",
-  `
-  <h2 style="color:#0f172a;">✅ Enrollment Confirmed</h2>
+    /* ================= SEND MAIL ================= */
 
-  <p>Hello <strong>${req.user.name}</strong>,</p>
+    const html = emailLayout(
+      "Enrollment Successful",
+      `
+      <h2 style="color:#0f172a;">✅ Enrollment Confirmed</h2>
 
-  <p>
-    You have successfully enrolled in the following course:
-  </p>
+      <p>Hello <strong>${req.user.name}</strong>,</p>
 
-  <div style="background:#f1f5f9;padding:15px;border-radius:6px;margin:20px 0;">
-    <p style="margin:0;"><strong>Course:</strong> ${course.name}</p>
-    <p style="margin:5px 0 0;"><strong>Instructor:</strong> ${course.User?.name || "TechZuno"}</p>
-    <p style="margin:5px 0 0;"><strong>Enrolled On:</strong> ${new Date().toDateString()}</p>
-  </div>
+      <p>You have successfully enrolled in:</p>
 
-  <p>
-    You can start learning immediately by accessing your dashboard.
-  </p>
+      <div style="background:#f1f5f9;padding:15px;border-radius:6px;margin:20px 0;">
+        <p><strong>Course:</strong> ${course.name}</p>
+        <p><strong>Enrolled On:</strong> ${new Date().toDateString()}</p>
 
-  <p>
-    Stay consistent and enjoy learning! 📘✨
-  </p>
+        ${
+          expiresAt
+            ? `<p><strong>Access Till:</strong> ${new Date(
+                expiresAt
+              ).toDateString()}</p>`
+            : ""
+        }
+      </div>
 
-  <p>— Team TechZuno</p>
-  `
-);
+      <p>Happy Learning! 📘</p>
 
-await mailer.sendMail(
-  req.user.email,
-  "📘 Enrollment Successful – Start Learning",
-  html
-);
+      <p>— Team Techzuno</p>
+      `
+    );
 
-    // ✅ AUTO-CREATE ROOM (CRITICAL FIX)
+    await mailer.sendMail(
+      req.user.email,
+      "📘 Enrollment Successful – Start Learning",
+      html
+    );
+
+    /* ================= AUTO ROOM ================= */
+
     if (course.hasRoom) {
       const existingRoom = await CourseRoom.findOne({
         where: { courseId },
@@ -113,26 +125,49 @@ await mailer.sendMail(
       }
     }
 
-    res.json({ message: "Enrolled successfully" });
+    res.json({
+      message: "Enrolled successfully",
+      expiresAt,
+    });
+
   } catch (err) {
     console.error("ENROLL ERROR:", err);
     res.status(500).json({ message: "Enrollment failed" });
   }
 };
 
+
 exports.getMyEnrollments = async (req, res) => {
   try {
     const enrollments = await Enrollment.findAll({
       where: { userId: req.user.id },
-      attributes: ["courseId"],
+
+      attributes: [
+        "courseId",
+        "expiresAt",
+        "enrolledAt",
+      ],
+
+      include: [
+        {
+          model: Course,
+          attributes: [
+            "id",
+            "isLimited",
+            "accessType",
+          ],
+        },
+      ],
     });
 
     res.json(enrollments);
+
   } catch (err) {
     console.error("GET MY ENROLLMENTS ERROR:", err);
     res.status(500).json({ message: "Failed to fetch enrollments" });
   }
 };
+
 
 exports.getEnrolledUsersByCourse = async (req, res) => {
   try {

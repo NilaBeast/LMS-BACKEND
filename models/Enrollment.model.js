@@ -1,9 +1,9 @@
-const {DataTypes} = require("sequelize");
-const {sequelize} = require("../config/db");
+const { DataTypes } = require("sequelize");
+const { sequelize } = require("../config/db");
 
 const Enrollment = sequelize.define(
-    "Enrollment",
-    {
+  "Enrollment",
+  {
     id: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
@@ -15,15 +15,24 @@ const Enrollment = sequelize.define(
       allowNull: false,
     },
 
-    expiresAt: {
-  type: DataTypes.DATE,
-},
-
-
     courseId: {
       type: DataTypes.UUID,
       allowNull: false,
     },
+
+    /* ================= NEW (SAFE ADDITION) ================= */
+
+    enrolledAt: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
+    },
+
+    expiresAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+
+    /* ======================================================= */
   },
   {
     tableName: "enrollments",

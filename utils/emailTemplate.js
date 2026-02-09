@@ -20,7 +20,7 @@ exports.emailLayout = (title, content) => {
             <!-- HEADER -->
             <tr>
               <td style="background:#1e293b;color:#ffffff;padding:20px;text-align:center;">
-                <h1 style="margin:0;font-size:22px;">TechZuno</h1>
+                <h1 style="margin:0;font-size:22px;">Techzuno</h1>
                 <p style="margin:5px 0 0;font-size:13px;opacity:.9;">
                   Learn. Grow. Succeed.
                 </p>
