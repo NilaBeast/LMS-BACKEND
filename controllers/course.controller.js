@@ -258,13 +258,13 @@ exports.updateCourse = async (req, res) => {
 
         course.accessType = accessType;
 
-        // FIXED DATE
+        // FIXED DATE (⚠️ DO NOT TOUCH OLD USERS)
         if (accessType === "fixed_date") {
           course.expiryDate = expiryDate;
           course.accessDays = null;
         }
 
-        // DAYS (Do NOT touch old enrollments)
+        // DAYS (old users also untouched)
         if (accessType === "days") {
           course.accessDays = accessDays;
           course.expiryDate = null;
@@ -283,24 +283,12 @@ exports.updateCourse = async (req, res) => {
 
     /* ================= SYNC OLD ENROLLMENTS ================= */
 
-    // Only for FIXED DATE (everyone same expiry)
-    if (
-      isLimited !== undefined &&
-      course.isLimited &&
-      course.accessType === "fixed_date"
-    ) {
-      await Enrollment.update(
-        {
-          expiresAt: course.expiryDate,
-        },
-        {
-          where: { courseId: course.id },
-        }
-      );
-    }
+    /**
+     * ONLY ONE CASE WE SYNC:
+     * Admin removes limit → make all users unlimited
+     */
+    if (isLimited !== undefined && course.isLimited === false) {
 
-    // If admin removes limit → make unlimited
-    if (isLimited !== undefined && !course.isLimited) {
       await Enrollment.update(
         {
           expiresAt: null,
@@ -324,7 +312,6 @@ exports.updateCourse = async (req, res) => {
     });
   }
 };
-
 
 
 /**
