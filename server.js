@@ -14,6 +14,9 @@ const roomRoutes = require("./routes/room.routes");
 const chapterRoutes = require("./routes/chapter.routes");
 const contentRoutes = require("./routes/content.routes");
 const bookmarkRoutes = require("./routes/bookmark.routes");
+const eventRoutes = require("./routes/event.routes");
+const eventRoomRoutes = require("./routes/eventRoom.routes");
+const quizRoutes = require("./routes/quiz.routes");
 
 // DB
 const { connectDB, sequelize } = require("./config/db");
@@ -54,9 +57,9 @@ app.use("/api/enroll", enrollmentRoutes);
 app.use("/api/chapters", chapterRoutes);
 app.use("/api/contents", contentRoutes);
 app.use("/api/bookmarks", bookmarkRoutes);
-
-
-
+app.use("/api/events", eventRoutes);
+app.use("/api/quizzes", quizRoutes);
+app.use("/api/event-rooms", eventRoomRoutes);
 
 
 // 👑 ADMIN PANEL
@@ -82,7 +85,7 @@ app.get("/", (req, res) => {
 
     // 3️⃣ Sync DB (DEV ONLY)
     // ⚠️ Use migrations in production
-    await sequelize.sync();
+    await sequelize.sync({alter: true});
 
     // 4️⃣ Start server
     app.listen(PORT, "0.0.0.0", () => {

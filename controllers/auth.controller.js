@@ -158,3 +158,22 @@ exports.emailLogin = async (req, res) => {
   }
 };
 
+exports.getHosts = async (req, res) => {
+  try {
+
+    const users = await User.findAll({
+      attributes: ["id", "email", "name"],
+      order: [["email", "ASC"]],
+    });
+
+    res.json(users);
+
+  } catch (err) {
+
+    console.error("GET HOSTS ERROR:", err);
+
+    res.status(500).json({
+      message: "Failed to load users",
+    });
+  }
+};

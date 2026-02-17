@@ -1,7 +1,15 @@
 const express = require("express");
-const {googleAuth, emailRegister, emailLogin} = require("../controllers/auth.controller");
+
+const {
+  googleAuth,
+  emailRegister,
+  emailLogin,
+  getHosts, // ✅ NEW
+} = require("../controllers/auth.controller");
+
 const router = express.Router();
-const {protect} = require("../middlewares/auth.middleware");
+
+const { protect } = require("../middlewares/auth.middleware");
 
 router.post("/google", googleAuth);
 router.post("/register", emailRegister);
@@ -14,9 +22,10 @@ router.get("/me", protect, (req, res) => {
     name: req.user.name,
     photo: req.user.photo,
     provider: req.user.provider,
-    role: req.user.role,
   });
 });
 
+/* ================= HOST LIST ================= */
+router.get("/hosts", protect, getHosts);
 
 module.exports = router;

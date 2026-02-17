@@ -38,7 +38,7 @@ exports.emailLayout = (title, content) => {
             <tr>
               <td style="background:#f8fafc;padding:20px;text-align:center;font-size:12px;color:#777;">
                 <p style="margin:0;">
-                  © ${new Date().getFullYear()} TechZuno. All rights reserved.
+                  © ${new Date().getFullYear()} Techzuno. All rights reserved.
                 </p>
 
                 <p style="margin:6px 0 0;">

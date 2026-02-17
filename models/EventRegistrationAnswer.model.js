@@ -1,8 +1,8 @@
 const { DataTypes } = require("sequelize");
 const { sequelize } = require("../config/db");
 
-const Chapter = sequelize.define(
-  "Chapter",
+const EventRegistrationAnswer = sequelize.define(
+  "EventRegistrationAnswer",
   {
     id: {
       type: DataTypes.UUID,
@@ -10,32 +10,25 @@ const Chapter = sequelize.define(
       primaryKey: true,
     },
 
-    courseId: {
+    registrationId: {
       type: DataTypes.UUID,
       allowNull: false,
     },
 
-    // NEW
-    type: {
-      type: DataTypes.ENUM("heading", "quiz", "assignment"),
-      allowNull: false,
-      defaultValue: "heading",
-    },
-
-    title: {
-      type: DataTypes.STRING,
+    questionId: {
+      type: DataTypes.UUID,
       allowNull: false,
     },
 
-    order: {
-      type: DataTypes.INTEGER,
+    answer: {
+      type: DataTypes.JSON,
       allowNull: false,
     },
   },
   {
-    tableName: "chapters",
+    tableName: "event_registration_answers",
     timestamps: true,
   }
 );
 
-module.exports = Chapter;
+module.exports = EventRegistrationAnswer;

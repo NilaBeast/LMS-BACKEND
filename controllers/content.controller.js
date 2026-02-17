@@ -2,12 +2,10 @@ const Content = require("../models/Content.model");
 const { sequelize } = require("../config/db");
 
 /* ================= CREATE CONTENT ================= */
-
 exports.createContent = async (req, res) => {
   try {
     const {
       title,
-      type,
       duration,
       pages,
       meta,
@@ -16,7 +14,13 @@ exports.createContent = async (req, res) => {
 
     const chapterId = req.params.chapterId;
 
-    /* GET LAST ORDER */
+    if (!title || !title.trim()) {
+      return res.status(400).json({
+        message: "Title required",
+      });
+    }
+
+    /* ORDER */
     const last = await Content.findOne({
       where: { chapterId },
       order: [["order", "DESC"]],
@@ -24,12 +28,25 @@ exports.createContent = async (req, res) => {
 
     const nextOrder = last ? last.order + 1 : 1;
 
-    /* BUILD DATA */
+    /* TYPE DETECTION */
+    let contentType = "text";
+
+    if (req.file) {
+      if (req.file.mimetype.startsWith("video/")) {
+        contentType = "video";
+      } else if (req.file.mimetype.startsWith("image/")) {
+        contentType = "image";
+      } else if (
+        req.file.mimetype === "application/pdf"
+      ) {
+        contentType = "pdf";
+      }
+    }
+
+    /* DATA */
     let data = {};
 
-    if (meta) {
-      data = JSON.parse(meta);
-    }
+    if (meta) data = JSON.parse(meta);
 
     if (req.file) {
       data.url = req.file.path;
@@ -41,7 +58,7 @@ exports.createContent = async (req, res) => {
     const content = await Content.create({
       chapterId,
       title,
-      type,
+      type: contentType,
 
       duration: Number(duration) || 0,
       pages: Number(pages) || 0,
