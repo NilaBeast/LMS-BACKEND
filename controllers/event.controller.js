@@ -754,35 +754,169 @@ exports.updateEvent = async (req, res) => {
 
   try {
 
-    const event = await Event.findByPk(req.params.id);
+    let {
+      title,
+      description,
+      startAt,
+      endAt,
+
+      sessionType,
+      sessionConfig,
+
+      hostId,
+      mode,
+      meetingLink,
+      locationAddress,
+
+      registrationClosed,
+      capacityEnabled,
+      capacity,
+      requireApproval,
+      eventUrl,
+      whatsappGroupUrl,
+
+      maxRegistrations,
+      landingPageUrl,
+
+      pricingType,
+      pricingBreakdown,
+
+      "pricing.amount": fixedPrice,
+      "pricing.min": minPrice,
+      "pricing.max": maxPrice,
+
+      "product.status": productStatus,
+    } = req.body;
+
+    const { id } = req.params;
+
+    const event = await Event.findByPk(id);
 
     if (!event) {
-      return res.status(404).json({
-        message: "Not found",
-      });
+      return res.status(404).json({ message: "Event not found" });
     }
 
+    /* ================= NORMALIZE ================= */
 
-    if (event.hostId !== req.user.id) {
-      return res.status(403).json({
-        message: "Unauthorized",
-      });
+    const finalCapacityEnabled =
+      capacityEnabled === true || capacityEnabled === "true";
+
+    const finalCapacity =
+      finalCapacityEnabled
+        ? Number(capacity) || 0
+        : null;
+
+    const finalRequireApproval =
+      requireApproval === true || requireApproval === "true";
+
+    const finalRegistrationClosed =
+      registrationClosed === true || registrationClosed === "true";
+
+    /* ================= COVER ================= */
+
+    let coverMedia = event.coverMedia;
+    let coverType = event.coverType;
+
+    if (req.file) {
+      coverMedia = req.file.path;
+      coverType = req.file.mimetype.startsWith("video")
+        ? "video"
+        : "image";
     }
 
+    /* ================= PRICING ================= */
 
-    await event.update(req.body);
+    let finalPricing = null;
 
-    res.json({ success: true, event });
+    if (pricingType === "fixed") {
+      finalPricing = { amount: Number(fixedPrice || 0) };
+    }
+
+    if (pricingType === "flexible") {
+      finalPricing = {
+        min: Number(minPrice || 0),
+        max: Number(maxPrice || 0),
+      };
+    }
+
+    /* ================= UPDATE ================= */
+
+    await event.update({
+
+      title,
+      description,
+
+      startAt,
+      endAt,
+
+      sessionType: sessionType || event.sessionType,
+
+      sessionConfig: sessionConfig
+        ? JSON.parse(sessionConfig)
+        : event.sessionConfig,
+
+      hostId:
+        hostId && hostId !== "undefined"
+          ? hostId
+          : event.hostId,
+
+      mode,
+      meetingLink,
+      locationAddress,
+
+      eventUrl,
+      whatsappGroupUrl,
+
+      coverMedia,
+      coverType,
+
+      registrationClosed: finalRegistrationClosed,
+      requireApproval: finalRequireApproval,
+
+      capacityEnabled: finalCapacityEnabled,
+      capacity: finalCapacity,
+
+      maxRegistrations:
+        maxRegistrations
+          ? Number(maxRegistrations)
+          : null,
+
+      landingPageUrl: landingPageUrl || null,
+
+      pricingType,
+      pricing: finalPricing,
+
+      pricingBreakdown: pricingBreakdown
+        ? JSON.parse(pricingBreakdown)
+        : event.pricingBreakdown,
+
+    });
+
+    /* ================= PRODUCT STATUS ================= */
+
+    if (productStatus && event.productId) {
+      await Product.update(
+        { status: productStatus },
+        { where: { id: event.productId } }
+      );
+    }
+
+    res.json({
+      success: true,
+      event,
+    });
 
   } catch (err) {
 
-    console.error("UPDATE:", err);
+    console.error("UPDATE EVENT ERROR:", err);
 
     res.status(500).json({
       message: "Update failed",
+      error: err.message,
     });
   }
 };
+
 
 
 /* ================= DELETE ================= */
