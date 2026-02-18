@@ -1,29 +1,72 @@
 const EventRoom = require("../models/EventRoom.model");
 const EventRoomMessage = require("../models/EventRoomMessage.model");
 const Event = require("../models/Event.model");
+const EventRegistration = require("../models/EventRegistration.model");
 const User = require("../models/User.model");
 
 
-/* ================= GET MESSAGES ================= */
+/* =====================================================
+   ACCESS CHECK HELPER
+===================================================== */
+
+async function checkRoomAccess(eventId, userId) {
+
+  const event = await Event.findByPk(eventId);
+
+  if (!event) {
+    return { error: 404 };
+  }
+
+  /* ✅ HOST ALWAYS ALLOWED */
+  if (event.hostId === userId) {
+    return { allowed: true };
+  }
+
+  /* ✅ STUDENT MUST BE APPROVED */
+  const registration = await EventRegistration.findOne({
+    where: {
+      eventId,
+      userId,
+      status: "approved",   // 🚨 IMPORTANT
+    },
+  });
+
+  if (!registration) {
+    return { error: 403 };
+  }
+
+  return { allowed: true };
+}
+
+
+
+/* =====================================================
+   GET MESSAGES
+===================================================== */
 
 exports.getMessages = async (req, res) => {
+
   try {
 
     const { eventId } = req.params;
+    const userId = req.user.id;
 
+    const access = await checkRoomAccess(eventId, userId);
 
-    /* CHECK EVENT EXISTS */
-    const event = await Event.findByPk(eventId);
-
-    if (!event) {
+    if (access.error === 404) {
       return res.status(404).json({
-        success: false,
         message: "Event not found",
       });
     }
 
+    if (access.error === 403) {
+      return res.status(403).json({
+        message: "Register and get approval to access this room",
+      });
+    }
 
-    /* FIND / CREATE ROOM */
+
+    /* FIND OR CREATE ROOM */
     let room = await EventRoom.findOne({
       where: { eventId },
     });
@@ -33,7 +76,6 @@ exports.getMessages = async (req, res) => {
     }
 
 
-    /* GET MESSAGES */
     const messages = await EventRoomMessage.findAll({
 
       where: { roomId: room.id },
@@ -48,52 +90,55 @@ exports.getMessages = async (req, res) => {
       order: [["createdAt", "ASC"]],
     });
 
-
-    /* ALWAYS RETURN ARRAY */
-    return res.json(messages || []);
-
+    res.json(messages || []);
 
   } catch (err) {
 
-    console.error("GET ROOM MSG ERROR:", err);
+    console.error("ROOM LOAD ERROR:", err);
 
     res.status(500).json({
-      success: false,
       message: "Failed to load messages",
     });
   }
 };
 
 
-/* ================= SEND MESSAGE ================= */
+
+/* =====================================================
+   SEND MESSAGE
+===================================================== */
 
 exports.sendMessage = async (req, res) => {
+
   try {
 
     const { eventId } = req.params;
     const { message } = req.body;
-
+    const userId = req.user.id;
 
     if (!message || !message.trim()) {
       return res.status(400).json({
-        success: false,
         message: "Message required",
       });
     }
 
 
-    /* CHECK EVENT */
-    const event = await Event.findByPk(eventId);
+    const access = await checkRoomAccess(eventId, userId);
 
-    if (!event) {
+    if (access.error === 404) {
       return res.status(404).json({
-        success: false,
         message: "Event not found",
       });
     }
 
+    if (access.error === 403) {
+      return res.status(403).json({
+        message: "Not allowed to send message",
+      });
+    }
 
-    /* FIND / CREATE ROOM */
+
+    /* FIND OR CREATE ROOM */
     let room = await EventRoom.findOne({
       where: { eventId },
     });
@@ -103,40 +148,30 @@ exports.sendMessage = async (req, res) => {
     }
 
 
-    /* SAVE MESSAGE */
     const msg = await EventRoomMessage.create({
-
       roomId: room.id,
-
-      userId: req.user.id,
-
+      userId,
       message: message.trim(),
     });
 
 
-    /* SEND BACK WITH USER */
-    const saved = await EventRoomMessage.findByPk(
-      msg.id,
-      {
-        include: [
-          {
-            model: User,
-            attributes: ["id", "name"],
-          },
-        ],
-      }
-    );
+    const saved = await EventRoomMessage.findByPk(msg.id, {
+      include: [
+        {
+          model: User,
+          attributes: ["id", "name"],
+        },
+      ],
+    });
 
 
     res.status(201).json(saved);
 
-
   } catch (err) {
 
-    console.error("SEND ROOM MSG ERROR:", err);
+    console.error("ROOM SEND ERROR:", err);
 
     res.status(500).json({
-      success: false,
       message: "Failed to send message",
     });
   }

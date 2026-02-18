@@ -2,7 +2,9 @@ const Event = require("../models/Event.model");
 const Product = require("../models/Product.model");
 const EventRegistration = require("../models/EventRegistration.model");
 
+
 exports.canAccessEventRoom = async (req, res, next) => {
+
   try {
 
     const { eventId } = req.params;
@@ -48,25 +50,29 @@ exports.canAccessEventRoom = async (req, res, next) => {
     }
 
 
-    /* ================= STUDENT → MUST BE REGISTERED ================= */
+    /* ================= ✅ STUDENT → MUST BE APPROVED ================= */
 
     const registered = await EventRegistration.findOne({
+
       where: {
         userId,
         eventId,
+        status: "approved", // 🔥 IMPORTANT FIX
       },
+
     });
+
 
     if (!registered) {
       return res.status(403).json({
         success: false,
-        type: "NOT_REGISTERED",
-        message: "Register to access event room",
+        type: "NOT_APPROVED",
+        message: "Wait for approval to access event room",
       });
     }
 
 
-    /* ================= ✅ REGISTERED STUDENT ================= */
+    /* ================= ✅ APPROVED STUDENT ================= */
 
     return next();
 
