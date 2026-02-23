@@ -15,7 +15,8 @@ const EventRoom = require("./EventRoom.model");
 const EventRoomMessage = require("./EventRoomMessage.model");
 const EventRegistrationQuestion = require("./EventRegistrationQuestion.model");
 const EventRegistrationAnswer = require("./EventRegistrationAnswer.model");
-
+const Session = require("./Session.model");
+const SessionBooking = require("./SessionBooking.model");
 
 /* ✅ NEW */
 const Quiz = require("./Quiz.model");
@@ -41,7 +42,9 @@ Product.hasOne(Course, {
   onDelete: "CASCADE",
 });
 
-Course.belongsTo(Product, { foreignKey: "productId" });
+Course.belongsTo(Product, {
+  foreignKey: "productId",
+});
 
 
 /* ================= COUPON ================= */
@@ -76,19 +79,22 @@ Course.hasMany(Chapter, {
   onDelete: "CASCADE",
 });
 
-Chapter.belongsTo(Course, { foreignKey: "courseId" });
+Chapter.belongsTo(Course, {
+  foreignKey: "courseId",
+});
 
 Chapter.hasMany(Content, {
   foreignKey: "chapterId",
   onDelete: "CASCADE",
 });
 
-Content.belongsTo(Chapter, { foreignKey: "chapterId" });
+Content.belongsTo(Chapter, {
+  foreignKey: "chapterId",
+});
 
 
-/* ================= QUIZ SYSTEM (NEW) ================= */
+/* ================= QUIZ SYSTEM ================= */
 
-/* CHAPTER → QUIZ (1:1) */
 Chapter.hasOne(Quiz, {
   foreignKey: "chapterId",
   onDelete: "CASCADE",
@@ -98,7 +104,6 @@ Quiz.belongsTo(Chapter, {
   foreignKey: "chapterId",
 });
 
-/* QUIZ → QUESTIONS (1:M) */
 Quiz.hasMany(QuizQuestion, {
   foreignKey: "quizId",
   onDelete: "CASCADE",
@@ -116,7 +121,10 @@ Product.hasOne(Event, {
   onDelete: "CASCADE",
 });
 
-Event.belongsTo(Product, { foreignKey: "productId" });
+Event.belongsTo(Product, {
+  foreignKey: "productId",
+});
+
 
 /* ================= EVENT QUESTIONS ================= */
 
@@ -144,10 +152,8 @@ EventRegistrationAnswer.belongsTo(EventRegistrationQuestion, {
 });
 
 
-
 /* ================= EVENT REGISTRATION ================= */
 
-// MANY-TO-MANY
 User.belongsToMany(Event, {
   through: EventRegistration,
   foreignKey: "userId",
@@ -157,8 +163,6 @@ Event.belongsToMany(User, {
   through: EventRegistration,
   foreignKey: "eventId",
 });
-
-// DIRECT ASSOCIATIONS
 
 EventRegistration.belongsTo(Event, {
   foreignKey: "eventId",
@@ -179,8 +183,13 @@ User.hasMany(EventRegistration, {
 
 /* ================= EVENT ROOM ================= */
 
-Event.hasOne(EventRoom, { foreignKey: "eventId" });
-EventRoom.belongsTo(Event, { foreignKey: "eventId" });
+Event.hasOne(EventRoom, {
+  foreignKey: "eventId",
+});
+
+EventRoom.belongsTo(Event, {
+  foreignKey: "eventId",
+});
 
 EventRoom.hasMany(EventRoomMessage, {
   foreignKey: "roomId",
@@ -210,8 +219,13 @@ User.hasMany(Event, {
 
 /* ================= COURSE ROOM ================= */
 
-Course.hasOne(CourseRoom, { foreignKey: "courseId" });
-CourseRoom.belongsTo(Course, { foreignKey: "courseId" });
+Course.hasOne(CourseRoom, {
+  foreignKey: "courseId",
+});
+
+CourseRoom.belongsTo(Course, {
+  foreignKey: "courseId",
+});
 
 CourseRoom.hasMany(RoomMessage, {
   foreignKey: "roomId",
@@ -228,11 +242,54 @@ RoomMessage.belongsTo(User, {
 
 /* ================= BOOKMARK ================= */
 
-User.hasMany(Bookmark, { foreignKey: "userId" });
-Bookmark.belongsTo(User, { foreignKey: "userId" });
+User.hasMany(Bookmark, {
+  foreignKey: "userId",
+});
 
-Course.hasMany(Bookmark, { foreignKey: "courseId" });
-Bookmark.belongsTo(Course, { foreignKey: "courseId" });
+Bookmark.belongsTo(User, {
+  foreignKey: "userId",
+});
+
+Course.hasMany(Bookmark, {
+  foreignKey: "courseId",
+});
+
+Bookmark.belongsTo(Course, {
+  foreignKey: "courseId",
+});
+
+
+/* ================= SESSION ================= */
+
+/* PRODUCT → SESSION */
+
+Product.hasOne(Session, {
+  foreignKey: "productId",
+  onDelete: "CASCADE",
+});
+
+Session.belongsTo(Product, {
+  foreignKey: "productId", // ✅ IMPORTANT FIX
+});
+
+
+/* SESSION → BOOKINGS */
+
+Session.hasMany(SessionBooking, {
+  foreignKey: "sessionId",
+});
+
+SessionBooking.belongsTo(Session, {
+  foreignKey: "sessionId",
+});
+
+User.hasMany(SessionBooking, {
+  foreignKey: "userId",
+});
+
+SessionBooking.belongsTo(User, {
+  foreignKey: "userId",
+});
 
 
 /* ================= EXPORT ================= */
@@ -252,9 +309,11 @@ module.exports = {
   EventRoomMessage,
   EventRegistration,
   EventRegistrationQuestion,
-EventRegistrationAnswer,
+  EventRegistrationAnswer,
 
   /* ✅ NEW EXPORTS */
   Quiz,
   QuizQuestion,
+  Session,
+  SessionBooking,
 };

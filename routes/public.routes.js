@@ -9,6 +9,11 @@ const Event = require("../models/Event.model");
 const Quiz = require("../models/Quiz.model");
 const QuizQuestion = require("../models/QuizQuestion.model");
 
+const Session = require("../models/Session.model");
+const SessionBooking = require("../models/SessionBooking.model");
+const User = require("../models/User.model");
+
+
 /* ================= COURSES ================= */
 
 router.get("/courses", async (req, res) => {
@@ -171,6 +176,76 @@ router.get("/quiz/:chapterId", async (req, res) => {
 
     res.status(500).json({
       message: "Failed to load quiz",
+    });
+  }
+});
+
+/* ================= SESSIONS ================= */
+
+/* Get all published sessions */
+
+router.get("/sessions", async (req, res) => {
+  try {
+
+    const sessions = await Session.findAll({
+      include: [
+        {
+          model: Product,
+          where: {
+            status: "published",
+            type: "session",
+          },
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.json(sessions);
+
+  } catch (err) {
+
+    console.error("PUBLIC SESSIONS ERROR:", err);
+
+    res.status(500).json({
+      message: "Load failed",
+    });
+  }
+});
+
+
+/* Get single session */
+
+router.get("/sessions/:id", async (req, res) => {
+  try {
+
+    const session = await Session.findOne({
+      where: { id: req.params.id },
+
+      include: [
+        {
+          model: Product,
+          where: {
+            status: "published",
+            type: "session",
+          },
+        },
+      ],
+    });
+
+    if (!session) {
+      return res.status(404).json({
+        message: "Not found",
+      });
+    }
+
+    res.json(session);
+
+  } catch (err) {
+
+    console.error("PUBLIC SESSION ERROR:", err);
+
+    res.status(500).json({
+      message: "Load failed",
     });
   }
 });
