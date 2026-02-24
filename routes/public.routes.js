@@ -13,6 +13,8 @@ const Session = require("../models/Session.model");
 const SessionBooking = require("../models/SessionBooking.model");
 const User = require("../models/User.model");
 
+const DigitalFile = require("../models/DigitalFile.model");
+
 
 /* ================= COURSES ================= */
 
@@ -250,7 +252,72 @@ router.get("/sessions/:id", async (req, res) => {
   }
 });
 
+/*=================DIGITAL FILES=============*/
+router.get("/digital-files", async (req, res) => {
+  try {
 
+    const files = await DigitalFile.findAll({
+      include: [
+        {
+          model: Product,
+          where: {
+            status: "published",
+            type: "digital",
+          },
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.json(files);
+
+  } catch (err) {
+
+    console.error("PUBLIC DIGITAL ERROR:", err);
+
+    res.status(500).json({
+      message: "Load failed",
+    });
+  }
+});
+
+
+/* GET SINGLE DIGITAL FILE */
+
+router.get("/digital-files/:id", async (req, res) => {
+  try {
+
+    const file = await DigitalFile.findOne({
+      where: { id: req.params.id },
+
+      include: [
+        {
+          model: Product,
+          where: {
+            status: "published",
+            type: "digital",
+          },
+        },
+      ],
+    });
+
+    if (!file) {
+      return res.status(404).json({
+        message: "Not found",
+      });
+    }
+
+    res.json(file);
+
+  } catch (err) {
+
+    console.error("PUBLIC DIGITAL SINGLE ERROR:", err);
+
+    res.status(500).json({
+      message: "Load failed",
+    });
+  }
+});
 /* ================= EXPORT ================= */
 
 module.exports = router;

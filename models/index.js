@@ -17,6 +17,9 @@ const EventRegistrationQuestion = require("./EventRegistrationQuestion.model");
 const EventRegistrationAnswer = require("./EventRegistrationAnswer.model");
 const Session = require("./Session.model");
 const SessionBooking = require("./SessionBooking.model");
+const DigitalFile = require("./DigitalFile.model");
+const DigitalFileContent = require("./DigitalFileContent.model");
+const DigitalPurchase = require("./DigitalPurchase.model");
 
 /* ✅ NEW */
 const Quiz = require("./Quiz.model");
@@ -291,6 +294,51 @@ SessionBooking.belongsTo(User, {
   foreignKey: "userId",
 });
 
+/* ================= DIGITAL FILE ================= */
+
+Product.hasOne(DigitalFile, {
+  foreignKey: "productId",
+  onDelete: "CASCADE",
+});
+
+DigitalFile.belongsTo(Product, {
+  foreignKey: "productId",
+});
+
+DigitalFile.hasMany(DigitalFileContent, {
+  foreignKey: "digitalFileId",
+  onDelete: "CASCADE",
+});
+
+DigitalFileContent.belongsTo(DigitalFile, {
+  foreignKey: "digitalFileId",
+});
+
+User.belongsToMany(DigitalFile, {
+  through: DigitalPurchase,
+  foreignKey: "userId",
+});
+
+DigitalFile.belongsToMany(User, {
+  through: DigitalPurchase,
+  foreignKey: "digitalFileId",
+});
+
+// Each purchase belongs to a user
+DigitalPurchase.belongsTo(User, {
+  foreignKey: "userId",
+  as: "User",
+});
+
+// A user can have many purchases
+User.hasMany(DigitalPurchase, {
+  foreignKey: "userId",
+  as: "Purchases",
+});
+
+
+
+
 
 /* ================= EXPORT ================= */
 
@@ -316,4 +364,7 @@ module.exports = {
   QuizQuestion,
   Session,
   SessionBooking,
+  DigitalFile,
+DigitalFileContent,
+DigitalPurchase,
 };

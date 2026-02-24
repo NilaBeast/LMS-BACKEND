@@ -2,79 +2,101 @@ const multer = require("multer");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const cloudinary = require("../config/cloudinary");
 
+
 /* ===============================
-   FILE FILTER (SECURITY)
+   FILE FILTER
 ================================ */
+
 const fileFilter = (req, file, cb) => {
+
   const allowed = [
+
+    // Images
     "image/jpeg",
     "image/jpg",
     "image/png",
     "image/webp",
     "image/gif",
 
+    // Videos
     "video/mp4",
-    "video/quicktime", // mov (optional)
+    "video/quicktime",
+
+    // ✅ PDFs
+    "application/pdf",
   ];
 
   if (allowed.includes(file.mimetype)) {
     cb(null, true);
   } else {
     cb(
-      new Error("Only JPG, PNG, WEBP, GIF, and MP4 videos are allowed"),
+      new Error("Only images, videos, and PDFs are allowed"),
       false
     );
   }
 };
 
+
 /* ===============================
    CLOUDINARY STORAGE
 ================================ */
+
 const storage = new CloudinaryStorage({
   cloudinary,
 
   params: async (req, file) => {
-    const isVideo = file.mimetype.startsWith("video");
+
+    const isVideo =
+      file.mimetype.startsWith("video");
+
+    const isPdf =
+      file.mimetype === "application/pdf";
 
     return {
-      folder: "events/media", // ✅ Dedicated folder
 
-      resource_type: isVideo ? "video" : "image",
+      folder: "digital-files",
 
-      format: isVideo ? "mp4" : "jpg",
+      // ✅ IMPORTANT
+      resource_type: isVideo
+        ? "video"
+        : isPdf
+        ? "raw"
+        : "image",
 
-      public_id: `event_${Date.now()}`,
+      // ❌ DO NOT FORCE FORMAT
+      // Cloudinary will decide
 
-      transformation: isVideo
-        ? [
-            {
-              quality: "auto",
-              fetch_format: "auto",
-            },
-          ]
-        : [
-            {
-              width: 1200,
-              height: 630,
-              crop: "limit",
-              quality: "auto",
-              fetch_format: "auto",
-            },
-          ],
+      public_id: `digital_${Date.now()}`,
+
+      transformation:
+        !isVideo && !isPdf
+          ? [
+              {
+                width: 1200,
+                height: 630,
+                crop: "limit",
+                quality: "auto",
+                fetch_format: "auto",
+              },
+            ]
+          : undefined,
     };
   },
 });
 
+
 /* ===============================
    MULTER CONFIG
 ================================ */
+
 const upload = multer({
+
   storage,
 
   fileFilter,
 
   limits: {
-    fileSize: 50 * 1024 * 1024, // ✅ 50MB (videos allowed)
+    fileSize: 50 * 1024 * 1024, // 50MB
   },
 });
 
