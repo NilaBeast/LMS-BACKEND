@@ -20,6 +20,10 @@ const SessionBooking = require("./SessionBooking.model");
 const DigitalFile = require("./DigitalFile.model");
 const DigitalFileContent = require("./DigitalFileContent.model");
 const DigitalPurchase = require("./DigitalPurchase.model");
+const Package = require("./Package.model");
+const PackageCourse = require("./PackageCourse.model");
+const PackagePurchase = require("./PackagePurchase.model");
+
 
 /* ✅ NEW */
 const Quiz = require("./Quiz.model");
@@ -336,7 +340,69 @@ User.hasMany(DigitalPurchase, {
   as: "Purchases",
 });
 
+/*==================PACKAGE / BUNDLE=============*/
 
+// Product → Package
+Product.hasOne(Package, {
+  foreignKey: "productId",
+  onDelete: "CASCADE",
+});
+
+Package.belongsTo(Product, {
+  foreignKey: "productId",
+});
+
+// 👉 Register join table relations FIRST (IMPORTANT)
+
+PackageCourse.belongsTo(Package, {
+  foreignKey: "packageId",
+});
+
+PackageCourse.belongsTo(Course, {
+  foreignKey: "courseId",
+});
+
+Package.hasMany(PackageCourse, {
+  foreignKey: "packageId",
+  onDelete: "CASCADE",
+});
+
+Course.hasMany(PackageCourse, {
+  foreignKey: "courseId",
+  onDelete: "CASCADE",
+});
+
+// 👉 THEN many-to-many
+
+Package.belongsToMany(Course, {
+  through: {
+    model: PackageCourse,
+    as: "PackageCourses",
+  },
+  foreignKey: "packageId",
+  otherKey: "courseId",
+});
+
+Course.belongsToMany(Package, {
+  through: {
+    model: PackageCourse,
+    as: "PackageCourses",
+  },
+  foreignKey: "courseId",
+  otherKey: "packageId",
+});
+
+// Package Purchase
+
+User.belongsToMany(Package, {
+  through: PackagePurchase,
+  foreignKey: "userId",
+});
+
+Package.belongsToMany(User, {
+  through: PackagePurchase,
+  foreignKey: "packageId",
+});
 
 
 
@@ -367,4 +433,9 @@ module.exports = {
   DigitalFile,
 DigitalFileContent,
 DigitalPurchase,
+
+// ✅ PACKAGE
+  Package,
+  PackageCourse,
+  PackagePurchase,
 };

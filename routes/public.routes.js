@@ -13,8 +13,14 @@ const Session = require("../models/Session.model");
 const SessionBooking = require("../models/SessionBooking.model");
 const User = require("../models/User.model");
 
-const DigitalFile = require("../models/DigitalFile.model");
+const Chapter = require("../models/Chapter.model");
+const Content = require("../models/Content.model");
 
+const DigitalFile = require("../models/DigitalFile.model");
+const Package = require("../models/Package.model");
+const PackageCourse = require("../models/PackageCourse.model");
+const { protectOptional } = require("../middlewares/auth.middleware");
+const PackagePurchase = require("../models/PackagePurchase.model");
 
 /* ================= COURSES ================= */
 
@@ -318,6 +324,85 @@ router.get("/digital-files/:id", async (req, res) => {
     });
   }
 });
+
+/*==================PACKAGE=================*/
+router.get("/packages", async (req, res) => {
+  const packages = await Package.findAll({
+    include: [{
+      model: Product,
+      where: { status: "published", type: "package" }
+    }]
+  });
+
+  res.json(packages);
+});
+
+router.get(
+  "/packages/:id",
+  protectOptional, // ✅ allow token if present
+  async (req, res) => {
+    try {
+
+      const pack = await Package.findOne({
+        where: { id: req.params.id },
+
+        include: [
+          {
+            model: Product,
+            where: {
+              status: "published",
+              type: "package",
+            },
+          },
+          {
+            model: Course,
+            include: [
+              {
+                model: Chapter,
+                include: [Content],
+              },
+            ],
+          },
+        ],
+      });
+
+      if (!pack) {
+        return res
+          .status(404)
+          .json({ message: "Package not found" });
+      }
+
+      /* ✅ CHECK PURCHASE */
+
+      let isPurchased = false;
+
+      if (req.user) {
+        const found = await PackagePurchase.findOne({
+          where: {
+            userId: req.user.id,
+            packageId: pack.id,
+          },
+        });
+
+        if (found) isPurchased = true;
+      }
+
+      /* ✅ SEND FLAG */
+
+      res.json({
+        ...pack.toJSON(),
+        isPurchased,
+      });
+
+    } catch (err) {
+      console.error("PUBLIC PACKAGE ERROR:", err);
+
+      res.status(500).json({
+        message: "Load failed",
+      });
+    }
+  }
+);
 /* ================= EXPORT ================= */
 
 module.exports = router;
