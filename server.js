@@ -2,13 +2,14 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 
-// ================= ROUTES =================
+/* ================= ROUTES ================= */
 
 const authRoutes = require("./routes/auth.routes");
 const businessRoutes = require("./routes/business.routes");
 const productRoutes = require("./routes/product.routes");
 const courseRoutes = require("./routes/course.routes");
-const packageRoutes = require("./routes/package.routes"); // ✅ NEW
+const packageRoutes = require("./routes/package.routes");
+const membershipRoutes = require("./routes/membership.routes"); // ✅ ADD THIS
 const adminRoutes = require("./routes/admin.routes");
 const publicRoutes = require("./routes/public.routes");
 const enrollmentRoutes = require("./routes/enrollment.routes");
@@ -22,17 +23,18 @@ const quizRoutes = require("./routes/quiz.routes");
 const sessionRoutes = require("./routes/session.routes");
 const digitalFileRoutes = require("./routes/digitalFile.routes");
 const purchaseRoutes = require("./routes/packagePurchase.routes");
-
-// ================= DB =================
+const membershipPurchaseRoutes = require("./routes/membershipPurchase.routes");
+const DigitalPurchase = require("./routes/purchase.routes");
+/* ================= DB ================= */
 
 const { connectDB, sequelize } = require("./config/db");
 
-// ================= APP =================
+/* ================= APP ================= */
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ================= MIDDLEWARE =================
+/* ================= MIDDLEWARE ================= */
 
 app.use(
   cors({
@@ -47,19 +49,21 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Static uploads
+/* ================= STATIC ================= */
+
 app.use("/uploads", express.static("uploads"));
 
-// ================= ROUTES =================
+/* ================= ROUTES ================= */
 
-// AUTH
+/* AUTH */
 app.use("/api/auth", authRoutes);
 
-// 🔐 ADMIN / AUTH
+/* ADMIN / AUTH */
 app.use("/api/business", businessRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/courses", courseRoutes);
-app.use("/api/packages", packageRoutes); // ✅ NEW
+app.use("/api/packages", packageRoutes);
+app.use("/api/memberships", membershipRoutes); // ✅ ADD THIS
 app.use("/api/enroll", enrollmentRoutes);
 app.use("/api/rooms", roomRoutes);
 app.use("/api/chapters", chapterRoutes);
@@ -70,34 +74,31 @@ app.use("/api/quizzes", quizRoutes);
 app.use("/api/event-rooms", eventRoomRoutes);
 app.use("/api/sessions", sessionRoutes);
 app.use("/api/digital-files", digitalFileRoutes);
+app.use("/api/purchase", DigitalPurchase);
 app.use("/api/purchase", purchaseRoutes);
-
-// 👑 ADMIN PANEL
+app.use("/api/membership-purchase", membershipPurchaseRoutes);
+/* ADMIN PANEL */
 app.use("/api/admin", adminRoutes);
 
-// 🌍 PUBLIC (NO AUTH)
+/* PUBLIC */
 app.use("/api/public", publicRoutes);
 
-// ================= HEALTH =================
+/* ================= HEALTH ================= */
 
 app.get("/", (req, res) => {
   res.send("Server is running 🚀");
 });
 
-// ================= SERVER =================
+/* ================= SERVER ================= */
 
 (async () => {
   try {
-    // Connect DB
     await connectDB();
 
-    // Load models & associations
     require("./models");
 
-    // Sync (DEV ONLY)
     await sequelize.sync({ alter: true });
 
-    // Start server
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`✅ Server running on port ${PORT}`);
     });

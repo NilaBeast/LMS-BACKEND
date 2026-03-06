@@ -23,7 +23,7 @@ const EventRegistrationAnswer =
 const mailer = require("../services/mail.service");
 const { emailLayout } =
   require("../utils/emailTemplate");
-
+const { parseMembership } = require("../utils/membershipParser");
 
 /* ================= HELPERS ================= */
 
@@ -204,14 +204,19 @@ exports.createEvent = async (req, res) => {
 
     /* PRODUCT */
 
-    const product = await Product.create(
-      {
-        businessId,
-        type: "event",
-        status: "draft",
-      },
-      { transaction: tx }
-    );
+    const { membershipRequired, membershipPlanIds } =
+  parseMembership(req.body);
+
+const product = await Product.create(
+{
+  businessId,
+  type: "event",
+  status: "draft",
+  membershipRequired,
+  membershipPlanIds,
+},
+{ transaction: tx }
+);
 
 
     /* NORMALIZE */
@@ -900,6 +905,23 @@ exports.updateEvent = async (req, res) => {
         { where: { id: event.productId } }
       );
     }
+
+    if (event.productId) {
+
+  const { membershipRequired, membershipPlanIds } =
+    parseMembership(req.body);
+
+  await Product.update(
+    {
+      membershipRequired,
+      membershipPlanIds,
+    },
+    {
+      where: { id: event.productId },
+    }
+  );
+
+}
 
     res.json({
       success: true,

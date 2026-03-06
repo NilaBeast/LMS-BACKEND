@@ -2,7 +2,7 @@ const router = require("express").Router();
 
 const { protect, protectOptional } = require("../middlewares/auth.middleware");
 const upload = require("../middlewares/sessionUpload");
-
+const membershipAccess = require("../middlewares/membershipAccess.middleware");
 const {
   createSession,
   updateSession,
@@ -25,7 +25,7 @@ router.get("/my", protect, getMySessions);
 
 router.get("/:id/bookings", protect, getBookings);
 
-router.post("/:id/book", protect, bookSession);
+router.post("/:id/book", protect,membershipAccess, bookSession);
 
 router.get("/public", getPublicSessions);
 

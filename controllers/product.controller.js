@@ -1,5 +1,7 @@
 const Product = require("../models/Product.model");
 const Business = require("../models/Business.model");
+const Course = require("../models/Course.model");
+const User = require("../models/User.model");
 const mailer = require("../services/mail.service");
 const { emailLayout } = require("../utils/emailTemplate");
 
@@ -65,15 +67,23 @@ exports.getProductById = async (req, res) => {
  */
 exports.updateProductStatus = async (req, res) => {
   try {
-    const { status } = req.body;
 
-    if (!["draft", "published"].includes(status)) {
+    const {
+      status,
+      membershipRequired,
+      membershipIds
+    } = req.body;
+
+    /* ================= VALIDATE STATUS ================= */
+
+    if (status && !["draft", "published"].includes(status)) {
       return res.status(400).json({
         message: "Invalid status",
       });
     }
 
-    /* 🔒 Verify business */
+    /* ================= VERIFY BUSINESS ================= */
+
     const business = await Business.findOne({
       where: { userId: req.user.id },
     });
@@ -84,7 +94,8 @@ exports.updateProductStatus = async (req, res) => {
       });
     }
 
-    /* 🔍 Find product */
+    /* ================= FIND PRODUCT ================= */
+
     const product = await Product.findOne({
       where: {
         id: req.params.id,
@@ -98,90 +109,130 @@ exports.updateProductStatus = async (req, res) => {
       });
     }
 
-    /* ✅ Update status */
-    product.status = status;
+    /* ================= UPDATE STATUS ================= */
+
+    if (status) {
+      product.status = status;
+    }
+
+    /* ================= MEMBERSHIP LOCK ================= */
+
+    if (membershipRequired !== undefined) {
+
+      const required =
+        membershipRequired === true ||
+        membershipRequired === "true";
+
+      product.membershipRequired =
+  req.body.membershipRequired == 1 ||
+  req.body.membershipRequired === "1" ||
+  req.body.membershipRequired === true;
+      if (required) {
+
+        product.membershipIds =
+          typeof membershipIds === "string"
+            ? JSON.parse(membershipIds)
+            : membershipIds;
+
+      } else {
+
+        product.membershipIds = null;
+
+      }
+
+    }
+
     await product.save();
 
-    /* ============================
-       📧 SEND MAIL ON PUBLISH
-       ============================ */
+    /* ======================================================
+       SEND EMAIL IF COURSE IS PUBLISHED
+    ====================================================== */
 
-    if (status === "published") {
+    if (product.status === "published" && product.type === "course") {
 
-      /* Get course */
       const course = await Course.findOne({
         where: { productId: product.id },
       });
 
-      /* Get all students */
-      const students = await User.findAll({
-        where: { role: "user" },
-      });
+      if (course) {
 
-      /* Send mails (background-safe) */
-      for (const student of students) {
+        const students = await User.findAll({
+          where: { role: "user" },
+        });
 
-        const html = emailLayout(
-          "New Course Available",
-          `
-          <h2>📢 New Course Launched!</h2>
+        for (const student of students) {
 
-          <p>Hello <strong>${student.name || "Student"}</strong>,</p>
+          const html = emailLayout(
+            "New Course Available",
+            `
+            <h2>📢 New Course Launched!</h2>
 
-          <p>
-            A brand new course is now available on TechZuno.
-          </p>
+            <p>Hello <strong>${student.name || "Student"}</strong>,</p>
 
-          <div style="background:#f1f5f9;padding:15px;border-radius:6px;margin:20px 0;">
-            <p><strong>Course:</strong> ${course.name}</p>
-            <p><strong>Instructor:</strong> ${req.user.name}</p>
-            <p><strong>Published On:</strong> ${new Date().toDateString()}</p>
-          </div>
+            <p>
+              A brand new course is now available on TechZuno.
+            </p>
 
-          <p>
-            Start learning today and boost your skills 🚀
-          </p>
+            <div style="
+              background:#f1f5f9;
+              padding:15px;
+              border-radius:6px;
+              margin:20px 0;
+            ">
+              <p><strong>Course:</strong> ${course.name}</p>
+              <p><strong>Instructor:</strong> ${req.user.name}</p>
+              <p><strong>Published On:</strong> ${new Date().toDateString()}</p>
+            </div>
 
-          <div style="text-align:center;margin:25px 0;">
-            <a href="${process.env.FRONTEND_URL}/courses"
-               style="
-                 background:#22c55e;
-                 color:#fff;
-                 padding:12px 22px;
-                 text-decoration:none;
-                 border-radius:5px;
-                 font-weight:600;
-               ">
-              View Course
-            </a>
-          </div>
+            <p>
+              Start learning today and boost your skills 🚀
+            </p>
 
-          <p>Happy Learning!</p>
-          <p>— Team TechZuno</p>
-          `
-        );
+            <div style="text-align:center;margin:25px 0;">
+              <a href="${process.env.FRONTEND_URL}/courses"
+                 style="
+                   background:#22c55e;
+                   color:#fff;
+                   padding:12px 22px;
+                   text-decoration:none;
+                   border-radius:5px;
+                   font-weight:600;
+                 ">
+                View Course
+              </a>
+            </div>
 
-        // Don't block API if mail fails
-        mailer.sendMail(
-          student.email,
-          "📢 New Course Available on TechZuno",
-          html
-        );
+            <p>Happy Learning!</p>
+            <p>— Team TechZuno</p>
+            `
+          );
+
+          mailer.sendMail(
+            student.email,
+            "📢 New Course Available on TechZuno",
+            html
+          );
+
+        }
+
       }
+
     }
 
-    /* ============================ */
+    /* ================= RESPONSE ================= */
 
     return res.json({
-      message: "Product status updated",
+      message: "Product updated successfully",
       product,
     });
 
   } catch (err) {
+
     console.error("UPDATE PRODUCT ERROR:", err);
 
     return res.status(500).json({
       message: "Failed to update product",
     });
+
   }
 };

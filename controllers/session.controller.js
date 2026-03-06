@@ -9,7 +9,7 @@ const {
 const mailer = require("../services/mail.service");
 const { emailLayout } = require("../utils/emailTemplate");
 const cloudinary = require("../config/cloudinary");
-
+const { parseMembership } = require("../utils/membershipParser");
 
 /* ================= PRICE BREAKDOWN ================= */
 
@@ -78,10 +78,15 @@ exports.createSession = async (req, res) => {
 
     /* Product */
 
-    const product = await Product.create({
-      businessId: business.id,
-      type: "session",
-    });
+    const { membershipRequired, membershipPlanIds } =
+  parseMembership(req.body);
+
+const product = await Product.create({
+  businessId: business.id,
+  type: "session",
+  membershipRequired,
+  membershipPlanIds,
+});
 
 
     /* Breakdown */
@@ -233,6 +238,7 @@ exports.updateSession = async (req, res) => {
     };
 
 
+
     /* Update */
 
     await session.update({
@@ -289,6 +295,20 @@ reminderEnabled:
 
       priceBreakdown: breakdown,
     });
+
+    
+    const { membershipRequired, membershipPlanIds } =
+  parseMembership(req.body);
+
+await Product.update(
+  {
+    membershipRequired,
+    membershipPlanIds,
+  },
+  {
+    where: { id: session.productId },
+  }
+);
 
 
     res.json(session);
@@ -444,7 +464,9 @@ const html = emailLayout(
 exports.getPublicSession = async (req, res) => {
   try {
 
-    const session = await Session.findByPk(req.params.id);
+    const session = await Session.findByPk(req.params.id, {
+  include: [Product],
+});
 
     if (!session) {
       return res.status(404).json({

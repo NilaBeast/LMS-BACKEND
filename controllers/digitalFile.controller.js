@@ -3,7 +3,7 @@ const DigitalFile = require("../models/DigitalFile.model");
 const DigitalFileContent = require("../models/DigitalFileContent.model");
 const DigitalPurchase = require("../models/DigitalPurchase.model");
 const Business = require("../models/Business.model");
-
+const {parseMembership}   = require("../utils/membershipParser");
 /* ================= CREATE ================= */
 
 exports.createDigitalFile = async (req, res) => {
@@ -32,12 +32,16 @@ exports.createDigitalFile = async (req, res) => {
     if (!business) {
       return res.status(403).json({ message: "Unauthorized" });
     }
+const { membershipRequired, membershipPlanIds } =
+  parseMembership(req.body);
 
-    const product = await Product.create({
-      businessId,
-      type: "digital",
-      status: "draft",
-    });
+const product = await Product.create({
+  businessId,
+  type: "digital",
+  status: "draft",
+  membershipRequired,
+  membershipPlanIds,
+});
 
     const digital = await DigitalFile.create({
 
@@ -105,6 +109,7 @@ exports.getMyDigitalFiles = async (req, res) => {
 
   const files = await DigitalFile.findAll({
     where: { productId: productIds },
+    include: [Product],
     order: [["createdAt", "DESC"]],
   });
 
@@ -118,9 +123,21 @@ exports.getDigitalFile = async (req, res) => {
   try {
 
     const file = await DigitalFile.findByPk(
-      req.params.id,
-      { include: [Product] }
-    );
+  req.params.id,
+  {
+    include: [
+      {
+        model: Product,
+        attributes: [
+          "id",
+          "membershipRequired",
+          "membershipPlanIds",
+          "status"
+        ],
+      },
+    ],
+  }
+);
 
     if (!file) {
       return res.status(404).json({
@@ -199,16 +216,30 @@ exports.getDigitalFile = async (req, res) => {
       }
     }
 
-    const result = file.toJSON();
+   const result = file.toJSON();
 
-    result.isPurchased = isPurchased;
-    result.purchaseDate = purchaseDate;
-    result.accessType = accessType;
-    result.accessDays = accessDays;
-    result.expiryDate = expiryDate;
-    result.isExpired = isExpired;
+/* FIX: ensure membershipPlanIds is always array */
+if (
+  result.Product &&
+  typeof result.Product.membershipPlanIds === "string"
+) {
+  try {
+    result.Product.membershipPlanIds = JSON.parse(
+      result.Product.membershipPlanIds
+    );
+  } catch {
+    result.Product.membershipPlanIds = [];
+  }
+}
 
-    res.json(result);
+result.isPurchased = isPurchased;
+result.purchaseDate = purchaseDate;
+result.accessType = accessType;
+result.accessDays = accessDays;
+result.expiryDate = expiryDate;
+result.isExpired = isExpired;
+
+res.json(result);
 
   } catch (err) {
 
@@ -256,39 +287,52 @@ exports.updateDigitalFile = async (req, res) => {
 
     /* ================= LIMITED ACCESS ================= */
 
-   if (req.body.accessType !== undefined) {
+    if (req.body.accessType !== undefined) {
 
-  if (!req.body.accessType) {
+      if (!req.body.accessType) {
 
-    // Lifetime
-    file.isLimited = false;
-    file.accessType = null;
-    file.accessDays = null;
-    file.expiryDate = null;
+        // Lifetime
+        file.isLimited = false;
+        file.accessType = null;
+        file.accessDays = null;
+        file.expiryDate = null;
 
-  } else {
+      } else {
 
-    file.isLimited = true;
-    file.accessType = req.body.accessType;
+        file.isLimited = true;
+        file.accessType = req.body.accessType;
 
-    if (req.body.accessType === "days") {
+        if (req.body.accessType === "days") {
 
-      file.accessDays =
-        Number(req.body.accessDays) || null;
+          file.accessDays =
+            Number(req.body.accessDays) || null;
 
-      file.expiryDate = null;
+          file.expiryDate = null;
 
+        }
+
+        if (req.body.accessType === "fixed_date") {
+
+          file.expiryDate =
+            req.body.expiryDate || null;
+
+          file.accessDays = null;
+        }
+      }
     }
 
-    if (req.body.accessType === "fixed_date") {
+    const { membershipRequired, membershipPlanIds } =
+  parseMembership(req.body);
 
-      file.expiryDate =
-        req.body.expiryDate || null;
-
-      file.accessDays = null;
-    }
-  }
+await Product.update(
+{
+  membershipRequired,
+  membershipPlanIds,
+},
+{
+  where: { id: file.productId },
 }
+);
 
     /* ================= SAVE ================= */
 

@@ -3,7 +3,7 @@ const router = express.Router();
 
 const upload = require("../middlewares/upload.middleware");
 const { protect } = require("../middlewares/auth.middleware");
-
+const membershipAccess = require("../middlewares/membershipAccess.middleware");
 const {
   createEvent,
   updateEvent,
@@ -38,7 +38,7 @@ const {
 /* ================= PUBLIC ================= */
 
 router.get("/public", getPublicEvents);
-router.get("/public/:id", getPublicEventById);
+router.get("/public/events/:id", getPublicEventById);
 
 
 /* ================= USER ================= */
@@ -50,7 +50,7 @@ router.post(
 );
 
 
-router.post("/:eventId/register", protect, registerForEvent);
+router.post("/:eventId/register", protect,membershipAccess, registerForEvent);
 
 router.get("/my-registrations", protect, getMyRegistrations);
 

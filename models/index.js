@@ -23,7 +23,12 @@ const DigitalPurchase = require("./DigitalPurchase.model");
 const Package = require("./Package.model");
 const PackageCourse = require("./PackageCourse.model");
 const PackagePurchase = require("./PackagePurchase.model");
-
+const Membership = require("./Membership.model");
+const MembershipPricing = require("./MembershipPricing.model");
+const MembershipQuestion = require("./MembershipQuestion.model");
+const MembershipQuestionOption = require("./MembershipQuestionOption.model");
+const MembershipPurchase = require("./MembershipPurchase.model");
+const MembershipAnswer = require("./MembershipAnswer.model");
 
 /* ✅ NEW */
 const Quiz = require("./Quiz.model");
@@ -404,6 +409,50 @@ Package.belongsToMany(User, {
   foreignKey: "packageId",
 });
 
+/*==================MEMBERSHIP===============*/
+/* PRODUCT → MEMBERSHIP */
+Product.hasOne(Membership, {
+  foreignKey: "productId",
+  onDelete: "CASCADE",
+});
+Membership.belongsTo(Product, {
+  foreignKey: "productId",
+});
+
+/* MEMBERSHIP → PRICING */
+Membership.hasMany(MembershipPricing, {
+  foreignKey: "membershipId",
+  onDelete: "CASCADE",
+});
+MembershipPricing.belongsTo(Membership, {
+  foreignKey: "membershipId",
+});
+
+/* MEMBERSHIP → QUESTIONS */
+Membership.hasMany(MembershipQuestion, {
+  foreignKey: "membershipId",
+  onDelete: "CASCADE",
+});
+MembershipQuestion.belongsTo(Membership, {
+  foreignKey: "membershipId",
+});
+
+/* QUESTION → OPTIONS */
+MembershipQuestion.hasMany(MembershipQuestionOption, {
+  foreignKey: "questionId",
+  onDelete: "CASCADE",
+});
+MembershipQuestionOption.belongsTo(MembershipQuestion);
+
+/* PURCHASE */
+MembershipPurchase.belongsTo(User, { foreignKey: "userId" });
+MembershipPurchase.belongsTo(Membership, { foreignKey: "membershipId" });
+
+MembershipPurchase.hasMany(MembershipAnswer, {
+  foreignKey: "purchaseId",
+});
+MembershipAnswer.belongsTo(MembershipPurchase);
+
 
 
 /* ================= EXPORT ================= */
@@ -438,4 +487,11 @@ DigitalPurchase,
   Package,
   PackageCourse,
   PackagePurchase,
+
+  Membership,
+  MembershipPricing,
+  MembershipQuestion,
+  MembershipQuestionOption,
+  MembershipPurchase,
+  MembershipAnswer,
 };

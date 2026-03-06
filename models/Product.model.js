@@ -14,7 +14,7 @@ const Product = sequelize.define("Product",{
   },
 
   type: {
-    type: DataTypes.ENUM("course", "event", "session", "digital", "package"),
+    type: DataTypes.ENUM("course", "event", "session", "digital", "package", "membership"),
     allowNull: false,
   },
 
@@ -22,6 +22,17 @@ const Product = sequelize.define("Product",{
     type: DataTypes.STRING,
     defaultValue: "draft", // draft | published
   },
+
+  /* ================= MEMBERSHIP ACCESS ================= */
+
+  membershipRequired: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+
+  membershipPlanIds: {
+  type: DataTypes.JSON
+},
 }, {
   tableName: "products",
   timestamps: true,

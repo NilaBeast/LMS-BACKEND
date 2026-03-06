@@ -9,7 +9,7 @@ const Product = require("../models/Product.model");
 const Business = require("../models/Business.model");
 const Course = require("../models/Course.model");
 const PackageCourse = require("../models/PackageCourse.model");
-
+const membershipAccess = require("../middlewares/membershipAccess.middleware");
 const {
   createPackage,
   updatePackage,
@@ -135,6 +135,6 @@ router.delete(
 
 /* ================= PUBLIC PACKAGE ================= */
 
-router.get("/public/:id", protectOptional, getPublicPackage);
+router.get("/public/:id", protectOptional,membershipAccess, getPublicPackage);
 
 module.exports = router;

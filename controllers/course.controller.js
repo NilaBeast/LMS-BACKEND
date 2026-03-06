@@ -6,7 +6,7 @@ const Enrollment = require("../models/Enrollment.model");
 const { sequelize } = require("../config/db");
 const mailer = require("../services/mail.service");
 const { emailLayout } = require("../utils/emailTemplate");
-
+const { parseMembership } = require("../utils/membershipParser");
 /**
  * CREATE COURSE (MULTI-BUSINESS SAFE)
  */
@@ -52,14 +52,19 @@ exports.createCourse = async (req, res) => {
       return res.status(403).json({ message: "Invalid business access" });
     }
 
-    const product = await Product.create(
-      {
-        businessId: business.id,
-        type: "course",
-        status: "draft",
-      },
-      { transaction }
-    );
+    const { membershipRequired, membershipPlanIds } =
+  parseMembership(req.body);
+
+const product = await Product.create(
+{
+  businessId: business.id,
+  type: "course",
+  status: "draft",
+  membershipRequired,
+  membershipPlanIds,
+},
+{ transaction }
+);
 
     const course = await Course.create(
       {
@@ -87,7 +92,11 @@ exports.createCourse = async (req, res) => {
       { transaction }
     );
 
+    
+
     await transaction.commit();
+
+    
 
     res.status(201).json(course);
   } catch (err) {
@@ -278,6 +287,19 @@ exports.updateCourse = async (req, res) => {
         course.accessDays = null;
       }
     }
+
+    const { membershipRequired, membershipPlanIds } =
+  parseMembership(req.body);
+
+await Product.update(
+{
+  membershipRequired,
+  membershipPlanIds,
+},
+{
+  where: { id: course.productId },
+}
+);
 
     await course.save();
 

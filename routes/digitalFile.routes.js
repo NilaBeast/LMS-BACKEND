@@ -1,10 +1,10 @@
 const router = require("express").Router();
 
-const { protect } = require("../middlewares/auth.middleware");
+const { protect, protectOptional } = require("../middlewares/auth.middleware");
 const upload = require("../middlewares/upload.middleware");
 
 const ctrl = require("../controllers/digitalFile.controller");
-
+const membershipAccess = require("../middlewares/membershipAccess.middleware");
 
 /* ================= MAIN ================= */
 
@@ -17,7 +17,7 @@ router.post(
 
 router.get("/my", protect, ctrl.getMyDigitalFiles);
 
-router.get("/:id", protect, ctrl.getDigitalFile);
+router.get("/:id", protectOptional, ctrl.getDigitalFile);
 
 router.put(
   "/:id",
@@ -51,6 +51,7 @@ router.post(
 router.get(
   "/:id/content",
   protect,
+  membershipAccess,
   ctrl.getContents
 );
 

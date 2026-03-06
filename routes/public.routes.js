@@ -1,5 +1,4 @@
 const express = require("express");
-
 const router = express.Router();
 
 const Course = require("../models/Course.model");
@@ -10,28 +9,44 @@ const Quiz = require("../models/Quiz.model");
 const QuizQuestion = require("../models/QuizQuestion.model");
 
 const Session = require("../models/Session.model");
-const SessionBooking = require("../models/SessionBooking.model");
-const User = require("../models/User.model");
 
 const Chapter = require("../models/Chapter.model");
 const Content = require("../models/Content.model");
 
 const DigitalFile = require("../models/DigitalFile.model");
+
 const Package = require("../models/Package.model");
-const PackageCourse = require("../models/PackageCourse.model");
-const { protectOptional } = require("../middlewares/auth.middleware");
 const PackagePurchase = require("../models/PackagePurchase.model");
 
-/* ================= COURSES ================= */
+const Membership = require("../models/Membership.model");
+const MembershipPricing = require("../models/MembershipPricing.model");
+const MembershipQuestion = require("../models/MembershipQuestion.model");
+const MembershipQuestionOption = require("../models/MembershipQuestionOption.model");
+const MembershipPurchase = require("../models/MembershipPurchase.model");
+
+const { protectOptional } = require("../middlewares/auth.middleware");
+const checkMembershipAccess = require("../utils/checkMembershipAccess");
+
+
+
+/* =======================================================
+   COURSES
+======================================================= */
 
 router.get("/courses", async (req, res) => {
   try {
+
     const courses = await Course.findAll({
       include: [
         {
           model: Product,
           where: { status: "published" },
-          attributes: ["status"],
+          attributes: [
+            "id",
+            "status",
+            "membershipRequired",
+            "membershipPlanIds"
+          ],
         },
       ],
       order: [["createdAt", "DESC"]],
@@ -40,17 +55,23 @@ router.get("/courses", async (req, res) => {
     res.json(courses);
 
   } catch (err) {
+
     console.error("PUBLIC COURSES ERROR:", err);
-    res.status(500).json({ message: "Load failed" });
+
+    res.status(500).json({
+      message: "Load failed",
+    });
+
   }
 });
 
 
-router.get("/courses/:id", async (req, res) => {
+router.get("/courses/:id", protectOptional, async (req, res) => {
+
   try {
+
     const course = await Course.findOne({
       where: { id: req.params.id },
-
       include: [
         {
           model: Product,
@@ -60,52 +81,45 @@ router.get("/courses/:id", async (req, res) => {
     });
 
     if (!course) {
-      return res
-        .status(404)
-        .json({ message: "Course not found" });
+      return res.status(404).json({
+        message: "Course not found",
+      });
+    }
+
+    const allowed = await checkMembershipAccess(
+      course.Product,
+      req.user
+    );
+
+    if (!allowed) {
+      return res.status(403).json({
+        message: "This course requires membership",
+      });
     }
 
     res.json(course);
 
   } catch (err) {
+
     console.error("PUBLIC COURSE ERROR:", err);
-    res.status(500).json({ message: "Load failed" });
+
+    res.status(500).json({
+      message: "Load failed",
+    });
+
   }
+
 });
 
 
-router.get("/courses/:id/landing", async (req, res) => {
+
+/* =======================================================
+   EVENTS
+======================================================= */
+
+router.get("/events", protectOptional, async (req, res) => {
   try {
-    const course = await Course.findOne({
-      where: { id: req.params.id },
-      include: [Product],
-    });
 
-    if (!course || course.Product.status !== "published") {
-      return res
-        .status(404)
-        .json({ message: "Not found" });
-    }
-
-    res.json({
-      id: course.id,
-      name: course.name,
-      description: course.description,
-      cover: course.coverImage,
-      pricing: course.pricing,
-    });
-
-  } catch (err) {
-    console.error("COURSE LANDING ERROR:", err);
-    res.status(500).json({ message: "Load failed" });
-  }
-});
-
-
-/* ================= EVENTS ================= */
-
-router.get("/events", async (req, res) => {
-  try {
     const events = await Event.findAll({
       include: [
         {
@@ -116,99 +130,101 @@ router.get("/events", async (req, res) => {
       order: [["startAt", "ASC"]],
     });
 
-    res.json(events);
+    const filtered = [];
 
-  } catch (err) {
-    console.error("PUBLIC EVENTS ERROR:", err);
-    res.status(500).json({ message: "Load failed" });
-  }
-});
+    for (const event of events) {
 
+      const allowed = await checkMembershipAccess(
+        event.Product,
+        req.user
+      );
 
-router.get("/events/:id", async (req, res) => {
-  try {
-    const event = await Event.findOne({
-      where: { id: req.params.id },
+      if (allowed) filtered.push(event);
 
-      include: [
-        {
-          model: Product,
-          where: { status: "published" },
-        },
-      ],
-    });
-
-    if (!event) {
-      return res
-        .status(404)
-        .json({ message: "Event not found" });
     }
 
-    res.json(event);
+    res.json(filtered);
 
   } catch (err) {
-    console.error("PUBLIC EVENT ERROR:", err);
-    res.status(500).json({ message: "Load failed" });
+
+    console.error("PUBLIC EVENTS ERROR:", err);
+
+    res.status(500).json({
+      message: "Load failed",
+    });
+
   }
 });
 
 
-/* ================= PUBLIC QUIZ ================= */
-/* ✅ NEW */
+
+/* =======================================================
+   QUIZ
+======================================================= */
 
 router.get("/quiz/:chapterId", async (req, res) => {
+
   try {
-    const { chapterId } = req.params;
 
     const quiz = await Quiz.findOne({
-      where: { chapterId },
-
-      include: [
-        {
-          model: QuizQuestion,
-          order: [["order", "ASC"]],
-        },
-      ],
+      where: { chapterId: req.params.chapterId },
+      include: [{ model: QuizQuestion }],
     });
 
     if (!quiz) {
-      return res
-        .status(404)
-        .json({ message: "Quiz not found" });
+      return res.status(404).json({
+        message: "Quiz not found",
+      });
     }
 
     res.json(quiz);
 
   } catch (err) {
+
     console.error("PUBLIC QUIZ ERROR:", err);
 
     res.status(500).json({
       message: "Failed to load quiz",
     });
+
   }
+
 });
 
-/* ================= SESSIONS ================= */
 
-/* Get all published sessions */
 
-router.get("/sessions", async (req, res) => {
+/* =======================================================
+   SESSIONS
+======================================================= */
+
+router.get("/sessions", protectOptional, async (req, res) => {
+
   try {
 
     const sessions = await Session.findAll({
       include: [
         {
           model: Product,
-          where: {
-            status: "published",
-            type: "session",
-          },
+          where: { status: "published", type: "session" },
         },
       ],
       order: [["createdAt", "DESC"]],
     });
 
-    res.json(sessions);
+    const filtered = [];
+
+    for (const session of sessions) {
+
+      const allowed = await checkMembershipAccess(
+        session.Product,
+        req.user
+      );
+
+      if (allowed) filtered.push(session);
+
+    }
+
+    res.json(filtered);
 
   } catch (err) {
 
@@ -217,65 +233,55 @@ router.get("/sessions", async (req, res) => {
     res.status(500).json({
       message: "Load failed",
     });
+
   }
+
 });
 
 
-/* Get single session */
 
-router.get("/sessions/:id", async (req, res) => {
-  try {
+/* =======================================================
+   DIGITAL FILES
+======================================================= */
 
-    const session = await Session.findOne({
-      where: { id: req.params.id },
-
-      include: [
-        {
-          model: Product,
-          where: {
-            status: "published",
-            type: "session",
-          },
-        },
-      ],
-    });
-
-    if (!session) {
-      return res.status(404).json({
-        message: "Not found",
-      });
-    }
-
-    res.json(session);
-
-  } catch (err) {
-
-    console.error("PUBLIC SESSION ERROR:", err);
-
-    res.status(500).json({
-      message: "Load failed",
-    });
-  }
-});
-
-/*=================DIGITAL FILES=============*/
-router.get("/digital-files", async (req, res) => {
+router.get("/digital-files", protectOptional, async (req, res) => {
   try {
 
     const files = await DigitalFile.findAll({
       include: [
         {
           model: Product,
-          where: {
-            status: "published",
-            type: "digital",
-          },
+          where: { status: "published", type: "digital" },
         },
       ],
       order: [["createdAt", "DESC"]],
     });
 
-    res.json(files);
+    const result = [];
+
+    for (const file of files) {
+
+      let locked = false;
+
+      if (file.Product.membershipRequired) {
+
+        const allowed = await checkMembershipAccess(
+          file.Product,
+          req.user
+        );
+
+        if (!allowed) locked = true;
+
+      }
+
+      const item = file.toJSON();
+      item.locked = locked;
+
+      result.push(item);
+
+    }
+
+    res.json(result);
 
   } catch (err) {
 
@@ -284,125 +290,235 @@ router.get("/digital-files", async (req, res) => {
     res.status(500).json({
       message: "Load failed",
     });
+
   }
 });
 
 
-/* GET SINGLE DIGITAL FILE */
 
-router.get("/digital-files/:id", async (req, res) => {
+/* =======================================================
+   PACKAGES
+======================================================= */
+
+router.get("/packages", protectOptional, async (req, res) => {
+
   try {
 
-    const file = await DigitalFile.findOne({
-      where: { id: req.params.id },
-
+    const packages = await Package.findAll({
       include: [
         {
           model: Product,
-          where: {
-            status: "published",
-            type: "digital",
-          },
+          where: { status: "published", type: "package" },
         },
       ],
     });
 
-    if (!file) {
-      return res.status(404).json({
-        message: "Not found",
-      });
-    }
+    const result = [];
 
-    res.json(file);
+for (const pack of packages) {
 
+  let locked = false;
+
+  if (pack.Product.membershipRequired) {
+
+    const allowed = await checkMembershipAccess(
+      pack.Product,
+      req.user
+    );
+
+    if (!allowed) locked = true;
+
+  }
+
+  const item = pack.toJSON();
+  item.locked = locked;
+
+  result.push(item);
+
+}
+
+res.json(result);
   } catch (err) {
 
-    console.error("PUBLIC DIGITAL SINGLE ERROR:", err);
+    console.error("PUBLIC PACKAGE ERROR:", err);
 
     res.status(500).json({
       message: "Load failed",
     });
+
   }
+
 });
 
-/*==================PACKAGE=================*/
-router.get("/packages", async (req, res) => {
-  const packages = await Package.findAll({
-    include: [{
-      model: Product,
-      where: { status: "published", type: "package" }
-    }]
-  });
 
-  res.json(packages);
-});
+router.get("/packages/:id", protectOptional, async (req, res) => {
 
-router.get(
-  "/packages/:id",
-  protectOptional, // ✅ allow token if present
-  async (req, res) => {
-    try {
+  try {
 
-      const pack = await Package.findOne({
-        where: { id: req.params.id },
+    const pack = await Package.findOne({
+      where: { id: req.params.id },
+      include: [
+        {
+          model: Product,
+          where: { status: "published", type: "package" },
+        },
+      ],
+    });
 
-        include: [
-          {
-            model: Product,
-            where: {
-              status: "published",
-              type: "package",
-            },
-          },
-          {
-            model: Course,
-            include: [
-              {
-                model: Chapter,
-                include: [Content],
-              },
-            ],
-          },
-        ],
-      });
-
-      if (!pack) {
-        return res
-          .status(404)
-          .json({ message: "Package not found" });
-      }
-
-      /* ✅ CHECK PURCHASE */
-
-      let isPurchased = false;
-
-      if (req.user) {
-        const found = await PackagePurchase.findOne({
-          where: {
-            userId: req.user.id,
-            packageId: pack.id,
-          },
-        });
-
-        if (found) isPurchased = true;
-      }
-
-      /* ✅ SEND FLAG */
-
-      res.json({
-        ...pack.toJSON(),
-        isPurchased,
-      });
-
-    } catch (err) {
-      console.error("PUBLIC PACKAGE ERROR:", err);
-
-      res.status(500).json({
-        message: "Load failed",
+    if (!pack) {
+      return res.status(404).json({
+        message: "Package not found",
       });
     }
+
+    let locked = false;
+
+if (pack.Product.membershipRequired) {
+
+  const allowed = await checkMembershipAccess(
+    pack.Product,
+    req.user
+  );
+
+  if (!allowed) locked = true;
+
+}
+
+    let isPurchased = false;
+
+    if (req.user) {
+
+      const found = await PackagePurchase.findOne({
+        where: {
+          userId: req.user.id,
+          packageId: pack.id,
+        },
+      });
+
+      if (found) isPurchased = true;
+
+    }
+
+    res.json({
+  ...pack.toJSON(),
+  isPurchased,
+  locked,
+});
+
+  } catch (err) {
+
+    console.error("PUBLIC PACKAGE ERROR:", err);
+
+    res.status(500).json({
+      message: "Load failed",
+    });
+
   }
-);
-/* ================= EXPORT ================= */
+
+});
+
+
+
+/* =======================================================
+   MEMBERSHIPS
+======================================================= */
+
+router.get("/memberships", async (req, res) => {
+
+  try {
+
+    const memberships = await Membership.findAll({
+      include: [
+        {
+          model: Product,
+          where: { status: "published", type: "membership" },
+        },
+        MembershipPricing,
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.json(memberships);
+
+  } catch (err) {
+
+    console.error("PUBLIC MEMBERSHIP ERROR:", err);
+
+    res.status(500).json({
+      message: "Load failed",
+    });
+
+  }
+
+});
+
+
+router.get("/memberships/:id", protectOptional, async (req, res) => {
+
+  try {
+
+    const membership = await Membership.findOne({
+      where: { id: req.params.id },
+      include: [
+        {
+          model: Product,
+          where: { status: "published", type: "membership" },
+        },
+        MembershipPricing,
+        {
+          model: MembershipQuestion,
+          include: [MembershipQuestionOption],
+        },
+      ],
+    });
+
+    if (!membership) {
+      return res.status(404).json({
+        message: "Membership not found",
+      });
+    }
+
+    let isPurchased = false;
+    let purchaseStatus = null;
+
+    if (req.user) {
+
+      const purchase = await MembershipPurchase.findOne({
+        where: {
+          userId: req.user.id,
+          membershipId: membership.id,
+        },
+      });
+
+      if (purchase) {
+        isPurchased = true;
+        purchaseStatus = purchase.status;
+      }
+
+    }
+
+    res.json({
+      ...membership.toJSON(),
+      isPurchased,
+      purchaseStatus,
+    });
+
+  } catch (err) {
+
+    console.error("PUBLIC MEMBERSHIP SINGLE ERROR:", err);
+
+    res.status(500).json({
+      message: "Load failed",
+    });
+
+  }
+
+});
+
+
+
+/* =======================================================
+   EXPORT
+======================================================= */
 
 module.exports = router;

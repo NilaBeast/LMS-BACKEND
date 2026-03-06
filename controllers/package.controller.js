@@ -6,7 +6,7 @@ const Business = require("../models/Business.model");
 const { sequelize } = require("../config/db");
 const jwt = require("jsonwebtoken");
 const PackagePurchase = require("../models/PackagePurchase.model");
-
+const { parseMembership } = require("../utils/membershipParser");
 
 /* ================= CREATE PACKAGE ================= */
 
@@ -38,14 +38,19 @@ exports.createPackage = async (req, res) => {
       return res.status(403).json({ message: "Invalid business access" });
     }
 
-    const product = await Product.create(
-      {
-        businessId: business.id,
-        type: "package",
-        status: "draft",
-      },
-      { transaction }
-    );
+    const { membershipRequired, membershipPlanIds } =
+  parseMembership(req.body);
+
+const product = await Product.create(
+{
+  businessId: business.id,
+  type: "package",
+  status: "draft",
+  membershipRequired,
+  membershipPlanIds,
+},
+{ transaction }
+);
 
     const pack = await Package.create(
       {
@@ -175,6 +180,19 @@ exports.updatePackage = async (req, res) => {
     if (req.file) {
       pack.banner = req.file.path;
     }
+
+    const { membershipRequired, membershipPlanIds } =
+  parseMembership(req.body);
+
+await Product.update(
+{
+  membershipRequired,
+  membershipPlanIds,
+},
+{
+  where: { id: pack.productId },
+}
+);
 
     await pack.save();
 
@@ -327,23 +345,26 @@ exports.getPublicPackage = async (req, res) => {
 
     /* ================= LOAD PACKAGE ================= */
 
-    const pack = await Package.findOne({
-      where: {
-        id: req.params.id,
-      },
+   const packs = await Package.findAll({
 
-      include: [
-        {
-          model: Course,
-          include: [
-            {
-              model: Chapter,
-              include: [Content],
-            },
-          ],
-        },
-      ],
-    });
+  include:[
+    {
+      model:Product,
+      where:{
+        status:"published",
+        type:"package"
+      },
+      attributes:[
+        "id",
+        "membershipRequired",
+        "membershipPlanIds"
+      ]
+    }
+  ],
+
+  order:[["createdAt","DESC"]]
+
+});
 
     if (!pack) {
       return res.status(404).json({
