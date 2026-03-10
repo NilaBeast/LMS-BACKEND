@@ -25,6 +25,7 @@ const digitalFileRoutes = require("./routes/digitalFile.routes");
 const purchaseRoutes = require("./routes/packagePurchase.routes");
 const membershipPurchaseRoutes = require("./routes/membershipPurchase.routes");
 const DigitalPurchase = require("./routes/purchase.routes");
+const aiCofounderRoutes = require("./routes/aiCofounder.routes");
 /* ================= DB ================= */
 
 const { connectDB, sequelize } = require("./config/db");
@@ -77,6 +78,8 @@ app.use("/api/digital-files", digitalFileRoutes);
 app.use("/api/purchase", DigitalPurchase);
 app.use("/api/purchase", purchaseRoutes);
 app.use("/api/membership-purchase", membershipPurchaseRoutes);
+app.use("/api/ai-cofounder", aiCofounderRoutes);
+// app.use("/ads", express.static("public/ads"));
 /* ADMIN PANEL */
 app.use("/api/admin", adminRoutes);
 

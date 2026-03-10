@@ -29,12 +29,18 @@ const MembershipQuestion = require("./MembershipQuestion.model");
 const MembershipQuestionOption = require("./MembershipQuestionOption.model");
 const MembershipPurchase = require("./MembershipPurchase.model");
 const MembershipAnswer = require("./MembershipAnswer.model");
+const AIChat = require("./AIChat.model");
+const AIAd = require("./AIAd.model");
+const AILandingPage = require("./AILandingPage.model");
 
 /* ✅ NEW */
 const Quiz = require("./Quiz.model");
 const QuizQuestion = require("./QuizQuestion.model");
 
-
+/*===================AI COFOUNDER=============*/
+AIChat.belongsTo(User, { foreignKey: "userId" });
+AIAd.belongsTo(User, { foreignKey: "userId" });
+AILandingPage.belongsTo(User, { foreignKey: "userId" });
 /* ================= BUSINESS ================= */
 
 User.hasMany(Business, { foreignKey: "userId" });
