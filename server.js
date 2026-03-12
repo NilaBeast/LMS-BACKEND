@@ -26,6 +26,8 @@ const purchaseRoutes = require("./routes/packagePurchase.routes");
 const membershipPurchaseRoutes = require("./routes/membershipPurchase.routes");
 const DigitalPurchase = require("./routes/purchase.routes");
 const aiCofounderRoutes = require("./routes/aiCofounder.routes");
+const paymentRoutes = require("./routes/payment.routes");
+// const webhookRoutes = require("./routes/webhook.routes");
 /* ================= DB ================= */
 
 const { connectDB, sequelize } = require("./config/db");
@@ -66,6 +68,8 @@ app.use("/api/courses", courseRoutes);
 app.use("/api/packages", packageRoutes);
 app.use("/api/memberships", membershipRoutes); // ✅ ADD THIS
 app.use("/api/enroll", enrollmentRoutes);
+app.use("/api/payment", paymentRoutes);
+// app.use("/api/webhook", webhookRoutes);
 app.use("/api/rooms", roomRoutes);
 app.use("/api/chapters", chapterRoutes);
 app.use("/api/contents", contentRoutes);
@@ -100,7 +104,7 @@ app.get("/", (req, res) => {
 
     require("./models");
 
-    await sequelize.sync({ alter: true });
+    await sequelize.sync({ });
 
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`✅ Server running on port ${PORT}`);

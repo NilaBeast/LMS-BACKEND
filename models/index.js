@@ -32,10 +32,17 @@ const MembershipAnswer = require("./MembershipAnswer.model");
 const AIChat = require("./AIChat.model");
 const AIAd = require("./AIAd.model");
 const AILandingPage = require("./AILandingPage.model");
-
+const Payment = require("./Payment.model");
 /* ✅ NEW */
 const Quiz = require("./Quiz.model");
 const QuizQuestion = require("./QuizQuestion.model");
+
+/*===================PAYMENT FOR COURSE============*/
+User.hasMany(Payment, { foreignKey: "userId" });
+Payment.belongsTo(User, { foreignKey: "userId" });
+
+Course.hasMany(Payment, { foreignKey: "courseId" });
+Payment.belongsTo(Course, { foreignKey: "courseId" });
 
 /*===================AI COFOUNDER=============*/
 AIChat.belongsTo(User, { foreignKey: "userId" });
@@ -479,7 +486,7 @@ module.exports = {
   EventRegistration,
   EventRegistrationQuestion,
   EventRegistrationAnswer,
-
+Payment,
   /* ✅ NEW EXPORTS */
   Quiz,
   QuizQuestion,

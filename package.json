@@ -13,8 +13,10 @@
     "@google/generative-ai": "^0.24.1",
     "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",
+    "cashfree-pg": "^5.1.0",
     "cloudinary": "^1.41.3",
     "cors": "^2.8.6",
+    "crypto": "^1.0.1",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "firebase-admin": "^13.6.0",
@@ -28,8 +30,9 @@
     "nodemailer": "^7.0.13",
     "openai": "^6.27.0",
     "path": "^0.12.7",
+    "pdfkit": "^0.17.2",
     "replicate": "^1.4.0",
     "sequelize": "^6.37.7",
-    "uuid": "^13.0.0"
+    "uuid": "^8.3.2"
   }
 }

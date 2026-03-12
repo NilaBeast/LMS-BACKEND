@@ -4,7 +4,7 @@ const router = express.Router();
 const {protect} = require("../middlewares/auth.middleware");
 const {enrollCourse, getMyEnrollments, getEnrolledUsersByCourse} = require("../controllers/enrollment.controller");
 const membershipAccess = require("../middlewares/membershipAccess.middleware");
-router.post("/", protect, enrollCourse);
+// router.post("/", protect, enrollCourse);
 
 router.get("/my", protect, getMyEnrollments);
 
