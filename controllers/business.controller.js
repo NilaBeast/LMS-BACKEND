@@ -1,4 +1,7 @@
 const Business = require("../models/Business.model");
+const Community = require("../models/Community.model");
+const CommunityMember = require("../models/CommunityMember.model");
+const { createSystemPost } = require("../utils/systemPost");
 
 const ALLOWED_CURRENCIES = [
   "INR","USD","EUR","GBP","JPY","AUD","CAD","SGD",
@@ -6,10 +9,13 @@ const ALLOWED_CURRENCIES = [
 ];
 
 /**
- * CREATE / UPDATE BUSINESS
+ * CREATE BUSINESS
  */
+
 exports.createBusiness = async (req, res) => {
+
   try {
+
     const {
       name,
       currency = "INR",
@@ -18,14 +24,25 @@ exports.createBusiness = async (req, res) => {
       twitter,
       linkedin,
       youtube,
-      threads,
+      threads
     } = req.body;
 
     if (!name) {
-      return res.status(400).json({ message: "Business name required" });
+      return res.status(400).json({
+        message: "Business name required"
+      });
     }
 
+    if (!ALLOWED_CURRENCIES.includes(currency)) {
+      return res.status(400).json({
+        message: "Invalid currency"
+      });
+    }
+
+    /* ================= CREATE BUSINESS ================= */
+
     const business = await Business.create({
+
       userId: req.user.id,
       name,
       currency,
@@ -35,32 +52,91 @@ exports.createBusiness = async (req, res) => {
       twitter,
       linkedin,
       youtube,
-      threads,
+      threads
+
     });
 
-    res.status(201).json(business);
+    /* ================= CREATE COMMUNITY ================= */
+
+    const community = await Community.create({
+      businessId: business.id
+    });
+
+    /* ================= OWNER IS ADMIN ================= */
+
+    await CommunityMember.create({
+
+      communityId: community.id,
+      userId: req.user.id,
+      role: "admin"
+
+    });
+
+    /* ================= 🔥 SYSTEM WELCOME POST ================= */
+
+    await createSystemPost({
+
+      communityId: community.id,
+
+      userId: req.user.id, // optional (can be null)
+
+      content: `🚀 Welcome !
+
+Your community "${business.name}" is now live 🎉
+
+Start posting, engaging and growing 🔥`,
+
+      gifUrl: "https://media.giphy.com/media/OkJat1YNdoD3W/giphy.gif",
+      visibility: "admin"
+
+    });
+
+    /* ================= RESPONSE ================= */
+
+    res.status(201).json({
+      business,
+      community
+    });
+
   } catch (err) {
+
     console.error(err);
-    res.status(500).json({ message: "Business creation failed" });
+
+    res.status(500).json({
+      message: "Business creation failed"
+    });
+
   }
+
 };
 
 
 /**
- * GET MY BUSINESS
+ * GET MY BUSINESSES
  */
+
 exports.getMyBusinesses = async (req, res) => {
+
   try {
-    const Business = require("../models/Business.model");
 
     const businesses = await Business.findAll({
+
       where: { userId: req.user.id },
-      order: [["createdAt", "DESC"]],
+
+      order: [["createdAt", "DESC"]]
+
     });
 
     res.json(businesses);
+
   } catch (err) {
-    console.error("GET MY BUSINESSES ERROR:", err);
-    res.status(500).json({ message: "Failed to fetch businesses" });
+
+    console.error(err);
+
+    res.status(500).json({
+      message: "Failed to fetch businesses"
+    });
+
   }
+
 };

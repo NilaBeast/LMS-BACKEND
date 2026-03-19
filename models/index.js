@@ -33,6 +33,14 @@ const AIChat = require("./AIChat.model");
 const AIAd = require("./AIAd.model");
 const AILandingPage = require("./AILandingPage.model");
 const Payment = require("./Payment.model");
+/* ================= COMMUNITY ================= */
+
+const Community = require("./Community.model");
+const CommunityMember = require("./CommunityMember.model");
+const CommunityPost = require("./CommunityPost.model");
+const CommunityPostComment = require("./CommunityPostComment.model");
+const CommunityPostLike = require("./CommunityPostLike.model");
+const CommunityMessage = require("./CommunityMessage.model");
 /* ✅ NEW */
 const Quiz = require("./Quiz.model");
 const QuizQuestion = require("./QuizQuestion.model");
@@ -59,6 +67,114 @@ Business.belongsTo(User, { foreignKey: "userId" });
 Business.hasMany(Product, { foreignKey: "businessId" });
 Product.belongsTo(Business, { foreignKey: "businessId" });
 
+/* ================= COMMUNITY ================= */
+
+/* BUSINESS → COMMUNITY */
+
+Business.hasOne(Community, {
+  foreignKey: "businessId",
+  onDelete: "CASCADE",
+});
+
+Community.belongsTo(Business, {
+  foreignKey: "businessId",
+});
+
+/* COMMUNITY MEMBERS */
+
+Community.hasMany(CommunityMember, {
+  foreignKey: "communityId",
+  onDelete: "CASCADE",
+});
+
+CommunityMember.belongsTo(Community, {
+  foreignKey: "communityId",
+});
+
+User.hasMany(CommunityMember, {
+  foreignKey: "userId",
+});
+
+CommunityMember.belongsTo(User, {
+  foreignKey: "userId",
+});
+
+/* COMMUNITY POSTS */
+
+Community.hasMany(CommunityPost, {
+  foreignKey: "communityId",
+  onDelete: "CASCADE",
+});
+
+CommunityPost.belongsTo(Community, {
+  foreignKey: "communityId",
+});
+
+User.hasMany(CommunityPost, {
+  foreignKey: "userId",
+});
+
+CommunityPost.belongsTo(User, {
+  foreignKey: "userId",
+});
+
+/* POST COMMENTS */
+
+CommunityPost.hasMany(CommunityPostComment, {
+  foreignKey: "postId",
+  onDelete: "CASCADE",
+});
+
+CommunityPostComment.belongsTo(CommunityPost, {
+  foreignKey: "postId",
+});
+
+CommunityPostComment.belongsTo(User,{
+  foreignKey:"userId"
+});
+
+CommunityPostComment.hasMany(CommunityPostComment,{
+  foreignKey:"parentId",
+  as:"replies"
+});
+
+/* POST LIKES */
+
+CommunityPost.hasMany(CommunityPostLike, {
+  foreignKey: "postId",
+  onDelete: "CASCADE",
+});
+
+CommunityPostLike.belongsTo(CommunityPost, {
+  foreignKey: "postId",
+});
+
+CommunityPostLike.belongsTo(User, {
+  foreignKey: "userId",
+});
+
+/* COMMUNITY MESSAGES */
+
+/* COMMUNITY MESSAGES */
+
+Community.hasMany(CommunityMessage, {
+  foreignKey: "communityId",
+  onDelete: "CASCADE",
+});
+
+CommunityMessage.belongsTo(Community, {
+  foreignKey: "communityId",
+});
+
+/* MESSAGE SENDER */
+
+User.hasMany(CommunityMessage, {
+  foreignKey: "userId",
+});
+
+CommunityMessage.belongsTo(User, {
+  foreignKey: "userId",
+});
 
 /* ================= COURSE ================= */
 
@@ -507,4 +623,11 @@ DigitalPurchase,
   MembershipQuestionOption,
   MembershipPurchase,
   MembershipAnswer,
+
+  Community,
+CommunityMember,
+CommunityPost,
+CommunityPostComment,
+CommunityPostLike,
+CommunityMessage,
 };

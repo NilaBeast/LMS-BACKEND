@@ -27,6 +27,9 @@ const membershipPurchaseRoutes = require("./routes/membershipPurchase.routes");
 const DigitalPurchase = require("./routes/purchase.routes");
 const aiCofounderRoutes = require("./routes/aiCofounder.routes");
 const paymentRoutes = require("./routes/payment.routes");
+const communityRoutes = require("./routes/community.routes");
+const communityPostRoutes = require("./routes/communityPost.routes");
+const communityMessageRoutes = require("./routes/communityMessage.routes");
 // const webhookRoutes = require("./routes/webhook.routes");
 /* ================= DB ================= */
 
@@ -83,6 +86,9 @@ app.use("/api/purchase", DigitalPurchase);
 app.use("/api/purchase", purchaseRoutes);
 app.use("/api/membership-purchase", membershipPurchaseRoutes);
 app.use("/api/ai-cofounder", aiCofounderRoutes);
+app.use("/api/community", communityRoutes);
+app.use("/api/community-post", communityPostRoutes);
+app.use("/api/community-message", communityMessageRoutes);
 // app.use("/ads", express.static("public/ads"));
 /* ADMIN PANEL */
 app.use("/api/admin", adminRoutes);
@@ -104,7 +110,7 @@ app.get("/", (req, res) => {
 
     require("./models");
 
-    await sequelize.sync({ });
+    await sequelize.sync({alter: true});
 
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`✅ Server running on port ${PORT}`);

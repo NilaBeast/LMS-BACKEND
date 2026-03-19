@@ -1,5 +1,7 @@
 const { v4: uuidv4 } = require("uuid");
-
+const Community = require("../models/Community.model");
+const CommunityMember = require("../models/CommunityMember.model");
+const Product = require("../models/Product.model");
 const Course = require("../models/Course.model");
 const Event = require("../models/Event.model");
 const Session = require("../models/Session.model");
@@ -258,34 +260,74 @@ async function sendPurchaseEmail(userId, itemName, amount, subject, htmlContent,
 
 }
 
+/* =====================================================
+   ADD USER TO COMMUNITY
+===================================================== */
 
+async function addUserToCommunity(userId, businessId, membershipId=null) {
+
+  const community = await Community.findOne({
+    where:{ businessId }
+  });
+
+  if(!community) return;
+
+  const existing = await CommunityMember.findOne({
+    where:{
+      communityId: community.id,
+      userId
+    }
+  });
+
+  if(existing) return;
+
+  await CommunityMember.create({
+    communityId: community.id,
+    userId,
+    role:"member",
+    membershipId
+  });
+
+}
 
 /* =====================================================
    PRODUCT HANDLERS
 ===================================================== */
 
+/* ================= COURSE ================= */
+
 async function enrollCourse(userId, payment) {
 
   const course = await Course.findByPk(payment.productId);
+
+  if (!course) {
+    console.log("❌ Course not found");
+    return;
+  }
+
+  const product = await Product.findByPk(course.productId);
+
+  if (!product) {
+    console.log("❌ Product not found (Course)");
+    return;
+  }
 
   await Enrollment.create({
     userId,
     courseId: course.id
   });
 
+  await addUserToCommunity(userId, product.businessId);
+
   const html = `
     <h2 style="color:#0f172a;">🎉 Course Enrollment Confirmed</h2>
-
     <p>Hello,</p>
-
     <p>You successfully enrolled in:</p>
-
     <div style="background:#f1f5f9;padding:15px;border-radius:6px;margin:20px 0;">
       <p><strong>Course:</strong> ${course.name}</p>
       <p><strong>Purchase Date:</strong> ${new Date().toDateString()}</p>
       <p><strong>Amount Paid:</strong> ₹${payment.amount}</p>
     </div>
-
     <p>Happy Learning 🚀</p>
   `;
 
@@ -297,14 +339,27 @@ async function enrollCourse(userId, payment) {
     html,
     payment.orderId
   );
-
 }
 
 
 
+/* ================= EVENT ================= */
+
 async function registerEvent(userId, payment) {
 
   const event = await Event.findByPk(payment.productId);
+
+  if (!event) {
+    console.log("❌ Event not found");
+    return;
+  }
+
+  const product = await Product.findByPk(event.productId);
+
+  if (!product) {
+    console.log("❌ Product not found (Event)");
+    return;
+  }
 
   await EventRegistration.create({
     userId,
@@ -312,19 +367,17 @@ async function registerEvent(userId, payment) {
     status: "approved"
   });
 
+  await addUserToCommunity(userId, product.businessId);
+
   const html = `
     <h2 style="color:#0f172a;">🎟 Event Registration Confirmed</h2>
-
     <p>Hello,</p>
-
     <p>You successfully registered for:</p>
-
     <div style="background:#f1f5f9;padding:15px;border-radius:6px;margin:20px 0;">
       <p><strong>Event:</strong> ${event.title}</p>
       <p><strong>Date:</strong> ${event.startAt ? new Date(event.startAt).toLocaleString() : "TBA"}</p>
       <p><strong>Amount Paid:</strong> ₹${payment.amount}</p>
     </div>
-
     <p>We look forward to seeing you there 🎉</p>
   `;
 
@@ -336,14 +389,27 @@ async function registerEvent(userId, payment) {
     html,
     payment.orderId
   );
-
 }
 
 
 
+/* ================= SESSION ================= */
+
 async function bookSession(userId, payment) {
 
   const session = await Session.findByPk(payment.productId);
+
+  if (!session) {
+    console.log("❌ Session not found");
+    return;
+  }
+
+  const product = await Product.findByPk(session.productId);
+
+  if (!product) {
+    console.log("❌ Product not found (Session)");
+    return;
+  }
 
   await SessionBooking.create({
     userId,
@@ -351,18 +417,16 @@ async function bookSession(userId, payment) {
     status: "confirmed"
   });
 
+  await addUserToCommunity(userId, product.businessId);
+
   const html = `
     <h2 style="color:#0f172a;">🤝 Session Booked</h2>
-
     <p>Hello,</p>
-
     <p>Your session booking is confirmed:</p>
-
     <div style="background:#f1f5f9;padding:15px;border-radius:6px;margin:20px 0;">
       <p><strong>Session:</strong> ${session.title}</p>
       <p><strong>Amount Paid:</strong> ₹${payment.amount}</p>
     </div>
-
     <p>We look forward to meeting you.</p>
   `;
 
@@ -374,32 +438,43 @@ async function bookSession(userId, payment) {
     html,
     payment.orderId
   );
-
 }
 
 
 
+/* ================= DIGITAL ================= */
+
 async function grantDigitalAccess(userId, payment) {
 
   const digital = await Digital.findByPk(payment.productId);
+
+  if (!digital) {
+    console.log("❌ Digital not found");
+    return;
+  }
+
+  const product = await Product.findByPk(digital.productId);
+
+  if (!product) {
+    console.log("❌ Product not found (Digital)");
+    return;
+  }
 
   await DigitalPurchase.create({
     userId,
     digitalFileId: digital.id
   });
 
+  await addUserToCommunity(userId, product.businessId);
+
   const html = `
     <h2 style="color:#0f172a;">📁 Digital Purchase Successful</h2>
-
     <p>Hello,</p>
-
     <p>You successfully purchased:</p>
-
     <div style="background:#f1f5f9;padding:15px;border-radius:6px;margin:20px 0;">
       <p><strong>Product:</strong> ${digital.title}</p>
       <p><strong>Amount Paid:</strong> ₹${payment.amount}</p>
     </div>
-
     <p>You can now download the file from your dashboard.</p>
   `;
 
@@ -411,32 +486,43 @@ async function grantDigitalAccess(userId, payment) {
     html,
     payment.orderId
   );
-
 }
 
 
 
+/* ================= PACKAGE ================= */
+
 async function activatePackage(userId, payment) {
 
   const pack = await Package.findByPk(payment.productId);
+
+  if (!pack) {
+    console.log("❌ Package not found");
+    return;
+  }
+
+  const product = await Product.findByPk(pack.productId);
+
+  if (!product) {
+    console.log("❌ Product not found (Package)");
+    return;
+  }
 
   await PackagePurchase.create({
     userId,
     packageId: pack.id
   });
 
+  await addUserToCommunity(userId, product.businessId);
+
   const html = `
     <h2 style="color:#0f172a;">📦 Package Purchase Successful</h2>
-
     <p>Hello,</p>
-
     <p>You successfully purchased:</p>
-
     <div style="background:#f1f5f9;padding:15px;border-radius:6px;margin:20px 0;">
       <p><strong>Package:</strong> ${pack.title}</p>
       <p><strong>Amount Paid:</strong> ₹${payment.amount}</p>
     </div>
-
     <p>All included courses are now unlocked 🚀</p>
   `;
 
@@ -448,14 +534,27 @@ async function activatePackage(userId, payment) {
     html,
     payment.orderId
   );
-
 }
 
 
 
+/* ================= MEMBERSHIP ================= */
+
 async function activateMembership(userId, payment) {
 
   const membership = await Membership.findByPk(payment.productId);
+
+  if (!membership) {
+    console.log("❌ Membership not found");
+    return;
+  }
+
+  const product = await Product.findByPk(membership.productId);
+
+  if (!product) {
+    console.log("❌ Product not found (Membership)");
+    return;
+  }
 
   await MembershipPurchase.create({
     userId,
@@ -463,18 +562,20 @@ async function activateMembership(userId, payment) {
     status: "approved"
   });
 
+  await addUserToCommunity(
+    userId,
+    product.businessId,
+    membership.id
+  );
+
   const html = `
     <h2 style="color:#0f172a;">👑 Membership Activated</h2>
-
     <p>Hello,</p>
-
     <p>Your membership is now active:</p>
-
     <div style="background:#f1f5f9;padding:15px;border-radius:6px;margin:20px 0;">
       <p><strong>Membership:</strong> ${membership.title}</p>
       <p><strong>Amount Paid:</strong> ₹${payment.amount}</p>
     </div>
-
     <p>Enjoy premium access 🚀</p>
   `;
 
@@ -486,5 +587,4 @@ async function activateMembership(userId, payment) {
     html,
     payment.orderId
   );
-
 }
