@@ -8,9 +8,12 @@ const Session = require("../models/Session.model");
 const Digital = require("../models/DigitalFile.model");
 const Package = require("../models/Package.model");
 const Membership = require("../models/Membership.model");
+const MembershipPricing = require("../models/MembershipPricing.model");
+const MembershipAnswer = require("../models/MembershipAnswer.model");
 const User = require("../models/User.model");
 const Business = require("../models/Business.model");
 const Enrollment = require("../models/Enrollment.model");
+const CourseRoom = require("../models/CourseRoom.model");
 const EventRegistration = require("../models/EventRegistration.model");
 const DigitalPurchase = require("../models/DigitalPurchase.model");
 const MembershipPurchase = require("../models/MembershipPurchase.model");
@@ -27,20 +30,29 @@ const { createOrder } = require("../services/cashfree.service");
 
 const fs = require("fs");
 
+function toAmount(...values) {
+  for (const value of values) {
+    const num = Number(value);
+    if (Number.isFinite(num) && num > 0) {
+      return num;
+    }
+  }
+
+  return 0;
+}
+
 /* =====================================================
    CREATE PAYMENT ORDER
 ===================================================== */
 
 exports.createOrder = async (req, res) => {
-
   try {
-
-    const { productId, productType } = req.body;
+    const { productId, productType, pricingId } = req.body;
     const userId = req.user.id;
 
     if (!productId || !productType) {
       return res.status(400).json({
-        message: "productId and productType required"
+        message: "productId and productType required",
       });
     }
 
@@ -49,33 +61,47 @@ exports.createOrder = async (req, res) => {
     /* ================= COURSE ================= */
 
     if (productType === "course") {
-
       const course = await Course.findByPk(productId);
 
       if (!course) return res.status(404).json({ message: "Course not found" });
 
-      amount = course.pricing?.price || 0;
+      if (course.pricingType === "fixed") {
+        amount = toAmount(course.pricing?.price, course.pricing?.fixed?.price);
+      } else if (course.pricingType === "flexible") {
+        amount = toAmount(
+          course.pricing?.min,
+          course.pricing?.minPrice,
+          course.pricing?.flexible?.min
+        );
+      } else if (course.pricingType === "installment") {
+        amount = toAmount(
+          course.pricing?.total,
+          course.pricing?.installment?.total
+        );
+      }
     }
 
     /* ================= EVENT ================= */
 
     if (productType === "event") {
-
       const event = await Event.findByPk(productId);
 
       if (!event) return res.status(404).json({ message: "Event not found" });
 
-      if (event.pricingType === "fixed") amount = event.pricing?.amount || 0;
-      else if (event.pricingType === "flexible") amount = event.pricing?.min || 0;
+      if (event.pricingType === "fixed") {
+        amount = toAmount(event.pricing?.amount, event.pricing?.fixed?.price);
+      }
+      else if (event.pricingType === "flexible")
+        amount = toAmount(event.pricing?.min, event.pricing?.flexible?.min);
     }
 
     /* ================= SESSION ================= */
 
     if (productType === "session") {
-
       const session = await Session.findByPk(productId);
 
-      if (!session) return res.status(404).json({ message: "Session not found" });
+      if (!session)
+        return res.status(404).json({ message: "Session not found" });
 
       amount = session.price || 0;
     }
@@ -83,44 +109,75 @@ exports.createOrder = async (req, res) => {
     /* ================= DIGITAL ================= */
 
     if (productType === "digital") {
-
       const digital = await Digital.findByPk(productId);
 
-      if (!digital) return res.status(404).json({ message: "Digital product not found" });
+      if (!digital)
+        return res.status(404).json({ message: "Digital product not found" });
 
-      if (digital.pricingType === "fixed") amount = digital.pricing?.price || 0;
-      else if (digital.pricingType === "flexible") amount = digital.pricing?.minPrice || 0;
-      else if (digital.pricingType === "booking") amount = digital.pricing?.bookingAmount || 0;
+      if (digital.pricingType === "fixed") {
+        amount = toAmount(digital.pricing?.price, digital.pricing?.fixed?.price);
+      }
+      else if (digital.pricingType === "flexible")
+        amount = toAmount(digital.pricing?.minPrice, digital.pricing?.flexible?.min);
+      else if (digital.pricingType === "booking")
+        amount = toAmount(digital.pricing?.bookingAmount);
+      else if (digital.pricingType === "installment")
+        amount = toAmount(
+          digital.pricing?.total,
+          digital.pricing?.installment?.total
+        );
     }
 
     /* ================= PACKAGE ================= */
 
     if (productType === "package") {
-
       const pack = await Package.findByPk(productId);
 
       if (!pack) return res.status(404).json({ message: "Package not found" });
 
-      if (pack.pricingType === "fixed") amount = pack.pricing?.price || 0;
-      else if (pack.pricingType === "flexible") amount = pack.pricing?.min || 0;
+      if (pack.pricingType === "fixed") {
+        amount = toAmount(pack.pricing?.price, pack.pricing?.fixed?.price);
+      } else if (pack.pricingType === "flexible") {
+        amount = toAmount(pack.pricing?.min, pack.pricing?.flexible?.min);
+      } else if (pack.pricingType === "installment") {
+        amount = toAmount(
+          pack.pricing?.total,
+          pack.pricing?.installment?.total
+        );
+      }
     }
 
     /* ================= MEMBERSHIP ================= */
 
     if (productType === "membership") {
-
       const membership = await Membership.findByPk(productId, {
-        include: ["MembershipPricings"]
+        include: [MembershipPricing],
       });
 
-      const plan = membership.MembershipPricings?.[0];
+      if (!membership) {
+        return res.status(404).json({ message: "Membership not found" });
+      }
+
+      let plan = null;
+
+      if (pricingId) {
+        plan = membership.MembershipPricings?.find((item) => item.id === pricingId);
+      }
+
+      if (!plan) {
+        plan = membership.MembershipPricings?.[0];
+      }
+
+      if (!plan) {
+        return res.status(400).json({ message: "Membership pricing not found" });
+      }
 
       amount = plan.price;
     }
 
     if (amount <= 0) {
       return res.status(400).json({
-        message: "Invalid price"
+        message: "Invalid price",
       });
     }
 
@@ -130,7 +187,7 @@ exports.createOrder = async (req, res) => {
       orderId,
       orderAmount: amount,
       customerId: userId,
-      customerEmail: req.user.email
+      customerEmail: req.user.email,
     });
 
     await Payment.create({
@@ -139,152 +196,165 @@ exports.createOrder = async (req, res) => {
       productType,
       orderId,
       amount,
-      status: "created"
+      status: "created",
     });
 
     res.json({
       orderId,
-      paymentSessionId: order.payment_session_id
+      paymentSessionId: order.payment_session_id,
     });
-
   } catch (err) {
-
     console.error("CREATE ORDER ERROR:", err);
 
     res.status(500).json({
-      message: "Payment order failed"
+      message: "Payment order failed",
     });
-
   }
-
 };
-
-
 
 /* =====================================================
    VERIFY PAYMENT
 ===================================================== */
 
 exports.verifyPayment = async (req, res) => {
-
   try {
+    const { orderId, paymentId, pricingId, answers } = req.body;
 
-    const { orderId, paymentId } = req.body;
-    const userId = req.user.id;
-
-    const payment = await Payment.findOne({ where: { orderId } });
+    const payment = await Payment.findOne({
+      where: {
+        orderId,
+        userId: req.user.id,
+      },
+    });
 
     if (!payment) {
       return res.status(404).json({ message: "Payment record not found" });
     }
 
     if (payment.status !== "paid") {
-
       payment.status = "paid";
       payment.paymentId = paymentId || null;
-
       await payment.save();
     }
 
-    if (payment.productType === "course")
-      await enrollCourse(userId, payment);
+    if (payment.productType === "course") {
+      await enrollCourse(payment.userId, payment);
+    }
 
-    if (payment.productType === "event")
-      await registerEvent(userId, payment);
+    if (payment.productType === "event") {
+      await registerEvent(payment.userId, payment);
+    }
 
-    if (payment.productType === "session")
-      await bookSession(userId, payment);
+    if (payment.productType === "session") {
+      await bookSession(payment.userId, payment);
+    }
 
-    if (payment.productType === "digital")
-      await grantDigitalAccess(userId, payment);
+    if (payment.productType === "digital") {
+      await grantDigitalAccess(payment.userId, payment);
+    }
 
-    if (payment.productType === "package")
-      await activatePackage(userId, payment);
+    if (payment.productType === "package") {
+      await activatePackage(payment.userId, payment);
+    }
 
-    if (payment.productType === "membership")
-      await activateMembership(userId, payment);
+    if (payment.productType === "membership") {
+      await activateMembership(payment.userId, payment, {
+        pricingId,
+        answers,
+      });
+    }
 
-    res.json({ message: "Payment verified successfully" });
-
+    res.json({
+      message:
+        payment.status === "paid"
+          ? "Payment verified successfully"
+          : "Payment already verified",
+    });
   } catch (err) {
-
     console.error("VERIFY PAYMENT ERROR:", err);
 
     res.status(500).json({
-      message: "Payment verification failed"
+      message: "Payment verification failed",
     });
-
   }
-
 };
-
-
 
 /* =====================================================
    SEND EMAIL + INVOICE HELPER
 ===================================================== */
 
-async function sendPurchaseEmail(userId, itemName, amount, subject, htmlContent, orderId) {
-
+async function sendPurchaseEmail(
+  userId,
+  businessId,
+  itemName,
+  amount,
+  subject,
+  htmlContent,
+  orderId,
+) {
   const user = await User.findByPk(userId);
-
-   /* ================= GET BUSINESS ================= */
-
-  const business = await Business.findOne({
-    where: { userId }
-  });
-
-  const invoicePath = await generateInvoice({
-    invoiceId: orderId,
-    customerName: user.name,
-    itemName,
-    amount,
-    business
-  });
+  if (!user?.email) {
+    return false;
+  }
 
   const html = emailLayout(subject, htmlContent);
+  const business = businessId ? await Business.findByPk(businessId) : null;
+  let invoicePath = null;
+  let attachments = [];
 
-  await mailer.sendMail(
-    user.email,
-    subject,
-    html,
-    [
+  try {
+    invoicePath = await generateInvoice({
+      invoiceId: orderId,
+      customerName: user.name,
+      itemName,
+      amount,
+      business,
+    });
+
+    attachments = [
       {
         filename: "invoice.pdf",
-        path: invoicePath
-      }
-    ]
-  );
+        path: invoicePath,
+      },
+    ];
+  } catch (err) {
+    console.error("INVOICE GENERATION FAILED:", err.message);
+  }
 
-  fs.unlinkSync(invoicePath);
+  const sent = await mailer.sendMail(user.email, subject, html, attachments);
 
+  if (invoicePath && fs.existsSync(invoicePath)) {
+    fs.unlinkSync(invoicePath);
+  }
+
+  return sent;
 }
 
 /* =====================================================
    ADD USER TO COMMUNITY
 ===================================================== */
 
-async function addUserToCommunity(userId, businessId, membershipId=null) {
+async function addUserToCommunity(userId, businessId, membershipId = null) {
 
   const community = await Community.findOne({
-    where:{ businessId }
+    where: { businessId }
   });
 
-  if(!community) return;
+  if (!community) return;
 
   const existing = await CommunityMember.findOne({
-    where:{
+    where: {
       communityId: community.id,
       userId
     }
   });
 
-  if(existing) return;
+  if (existing) return;
 
   await CommunityMember.create({
     communityId: community.id,
     userId,
-    role:"member",
+    role: "member",
     membershipId
   });
 
@@ -297,8 +367,10 @@ async function addUserToCommunity(userId, businessId, membershipId=null) {
 /* ================= COURSE ================= */
 
 async function enrollCourse(userId, payment) {
-
   const course = await Course.findByPk(payment.productId);
+  if (!course) {
+    throw new Error("Course not found while processing a paid order");
+  }
 
   if (!course) {
     console.log("❌ Course not found");
@@ -312,10 +384,51 @@ async function enrollCourse(userId, payment) {
     return;
   }
 
+  const existing = await Enrollment.findOne({
+    where: {
+      userId,
+      courseId: course.id,
+    },
+  });
+
+  if (existing) {
+    await addUserToCommunity(userId, product.businessId);
+    return;
+  }
+
+  let expiresAt = null;
+
+  if (course.isLimited) {
+    if (course.accessType === "fixed_date") {
+      expiresAt = course.expiryDate;
+    }
+
+    if (course.accessType === "days" && course.accessDays) {
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + Number(course.accessDays));
+      expiresAt = expiry;
+    }
+  }
+
   await Enrollment.create({
     userId,
-    courseId: course.id
+    courseId: course.id,
+    businessId: product.businessId,
+    expiresAt,
   });
+
+  if (course.hasRoom) {
+    const existingRoom = await CourseRoom.findOne({
+      where: { courseId: course.id },
+    });
+
+    if (!existingRoom) {
+      await CourseRoom.create({
+        courseId: course.id,
+        businessId: product.businessId,
+      });
+    }
+  }
 
   await addUserToCommunity(userId, product.businessId);
 
@@ -333,11 +446,12 @@ async function enrollCourse(userId, payment) {
 
   await sendPurchaseEmail(
     userId,
+    product.businessId,
     course.name,
     payment.amount,
     "📘 Course Enrollment Successful",
     html,
-    payment.orderId
+    payment.orderId,
   );
 }
 
@@ -346,7 +460,6 @@ async function enrollCourse(userId, payment) {
 /* ================= EVENT ================= */
 
 async function registerEvent(userId, payment) {
-
   const event = await Event.findByPk(payment.productId);
 
   if (!event) {
@@ -361,10 +474,22 @@ async function registerEvent(userId, payment) {
     return;
   }
 
+  const existingEventRegistration = await EventRegistration.findOne({
+    where: {
+      userId,
+      eventId: event.id,
+    },
+  });
+
+  if (existingEventRegistration) {
+    await addUserToCommunity(userId, product.businessId);
+    return;
+  }
+
   await EventRegistration.create({
     userId,
     eventId: event.id,
-    status: "approved"
+    status: "approved",
   });
 
   await addUserToCommunity(userId, product.businessId);
@@ -383,11 +508,12 @@ async function registerEvent(userId, payment) {
 
   await sendPurchaseEmail(
     userId,
+    product.businessId,
     event.title,
     payment.amount,
     "🎟 Event Registration Confirmed",
     html,
-    payment.orderId
+    payment.orderId,
   );
 }
 
@@ -396,7 +522,6 @@ async function registerEvent(userId, payment) {
 /* ================= SESSION ================= */
 
 async function bookSession(userId, payment) {
-
   const session = await Session.findByPk(payment.productId);
 
   if (!session) {
@@ -411,10 +536,22 @@ async function bookSession(userId, payment) {
     return;
   }
 
+  const existingSessionBooking = await SessionBooking.findOne({
+    where: {
+      userId,
+      sessionId: session.id,
+    },
+  });
+
+  if (existingSessionBooking) {
+    await addUserToCommunity(userId, product.businessId);
+    return;
+  }
+
   await SessionBooking.create({
     userId,
     sessionId: session.id,
-    status: "confirmed"
+    status: "confirmed",
   });
 
   await addUserToCommunity(userId, product.businessId);
@@ -432,11 +569,12 @@ async function bookSession(userId, payment) {
 
   await sendPurchaseEmail(
     userId,
+    product.businessId,
     session.title,
     payment.amount,
     "🤝 Session Booking Confirmed",
     html,
-    payment.orderId
+    payment.orderId,
   );
 }
 
@@ -445,7 +583,6 @@ async function bookSession(userId, payment) {
 /* ================= DIGITAL ================= */
 
 async function grantDigitalAccess(userId, payment) {
-
   const digital = await Digital.findByPk(payment.productId);
 
   if (!digital) {
@@ -460,9 +597,21 @@ async function grantDigitalAccess(userId, payment) {
     return;
   }
 
+  const existingDigitalPurchase = await DigitalPurchase.findOne({
+    where: {
+      userId,
+      digitalFileId: digital.id,
+    },
+  });
+
+  if (existingDigitalPurchase) {
+    await addUserToCommunity(userId, product.businessId);
+    return;
+  }
+
   await DigitalPurchase.create({
     userId,
-    digitalFileId: digital.id
+    digitalFileId: digital.id,
   });
 
   await addUserToCommunity(userId, product.businessId);
@@ -480,11 +629,12 @@ async function grantDigitalAccess(userId, payment) {
 
   await sendPurchaseEmail(
     userId,
+    product.businessId,
     digital.title,
     payment.amount,
     "📁 Digital Purchase Successful",
     html,
-    payment.orderId
+    payment.orderId,
   );
 }
 
@@ -493,7 +643,6 @@ async function grantDigitalAccess(userId, payment) {
 /* ================= PACKAGE ================= */
 
 async function activatePackage(userId, payment) {
-
   const pack = await Package.findByPk(payment.productId);
 
   if (!pack) {
@@ -508,9 +657,21 @@ async function activatePackage(userId, payment) {
     return;
   }
 
+  const existingPackagePurchase = await PackagePurchase.findOne({
+    where: {
+      userId,
+      packageId: pack.id,
+    },
+  });
+
+  if (existingPackagePurchase) {
+    await addUserToCommunity(userId, product.businessId);
+    return;
+  }
+
   await PackagePurchase.create({
     userId,
-    packageId: pack.id
+    packageId: pack.id,
   });
 
   await addUserToCommunity(userId, product.businessId);
@@ -528,11 +689,12 @@ async function activatePackage(userId, payment) {
 
   await sendPurchaseEmail(
     userId,
+    product.businessId,
     pack.title,
     payment.amount,
     "📦 Package Purchase Successful",
     html,
-    payment.orderId
+    payment.orderId,
   );
 }
 
@@ -540,8 +702,7 @@ async function activatePackage(userId, payment) {
 
 /* ================= MEMBERSHIP ================= */
 
-async function activateMembership(userId, payment) {
-
+async function activateMembership(userId, payment, meta = {}) {
   const membership = await Membership.findByPk(payment.productId);
 
   if (!membership) {
@@ -556,11 +717,67 @@ async function activateMembership(userId, payment) {
     return;
   }
 
-  await MembershipPurchase.create({
+  let selectedPricingId = meta.pricingId || null;
+
+  if (selectedPricingId) {
+    const pricing = await MembershipPricing.findOne({
+      where: {
+        id: selectedPricingId,
+        membershipId: membership.id,
+      },
+    });
+
+    if (!pricing) {
+      selectedPricingId = null;
+    }
+  }
+
+  if (!selectedPricingId) {
+    const firstPricing = await MembershipPricing.findOne({
+      where: { membershipId: membership.id },
+      order: [["createdAt", "ASC"]],
+    });
+
+    selectedPricingId = firstPricing?.id || null;
+  }
+
+  const existingMembershipPurchase = await MembershipPurchase.findOne({
+    where: {
+      userId,
+      membershipId: membership.id,
+      status: "approved",
+    },
+  });
+
+  if (existingMembershipPurchase) {
+    await addUserToCommunity(
+      userId,
+      product.businessId,
+      membership.id
+    );
+    return;
+  }
+
+  const purchase = await MembershipPurchase.create({
     userId,
     membershipId: membership.id,
-    status: "approved"
+    pricingId: selectedPricingId,
+    status: "approved",
   });
+
+  if (Array.isArray(meta.answers) && meta.answers.length) {
+    for (const answer of meta.answers) {
+      if (!answer?.questionId) continue;
+
+      await MembershipAnswer.create({
+        purchaseId: purchase.id,
+        questionId: answer.questionId,
+        answer: Array.isArray(answer.answer)
+          ? JSON.stringify(answer.answer)
+          : answer.answer,
+      });
+    }
+  }
 
   await addUserToCommunity(
     userId,
@@ -581,10 +798,11 @@ async function activateMembership(userId, payment) {
 
   await sendPurchaseEmail(
     userId,
+    product.businessId,
     membership.title,
     payment.amount,
     "👑 Membership Activated",
     html,
-    payment.orderId
+    payment.orderId,
   );
 }

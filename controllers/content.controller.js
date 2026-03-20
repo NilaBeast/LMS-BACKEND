@@ -1,5 +1,6 @@
 const Content = require("../models/Content.model");
 const { sequelize } = require("../config/db");
+const cloudinary = require("../config/cloudinary");
 
 /* ================= CREATE CONTENT ================= */
 exports.createContent = async (req, res) => {
@@ -118,5 +119,39 @@ exports.reorderContents = async (req, res) => {
   } catch {
     await transaction.rollback();
     res.status(500).json({ message: "Failed to reorder contents" });
+  }
+};
+
+/* ================= DELETE CONTENT ================= */
+exports.deleteContent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const content = await Content.findByPk(id);
+
+    if (!content) {
+      return res.status(404).json({ message: "Content not found" });
+    }
+
+    /* DELETE FROM CLOUDINARY IF EXISTS */
+    if (content.data?.publicId) {
+      try {
+        let resourceType = "video";
+        if (content.type === "pdf" || content.type === "raw") resourceType = "raw";
+        else if (content.type === "image") resourceType = "image";
+        
+        await cloudinary.uploader.destroy(content.data.publicId, {
+          resource_type: resourceType,
+        });
+      } catch (err) {
+        console.error("Cloudinary delete failed:", err);
+      }
+    }
+
+    /* DELETE FROM DB */
+    await content.destroy();
+    res.json({ message: "Content deleted successfully" });
+  } catch (err) {
+    console.error("DELETE CONTENT ERROR:", err);
+    res.status(500).json({ message: "Failed to delete content" });
   }
 };

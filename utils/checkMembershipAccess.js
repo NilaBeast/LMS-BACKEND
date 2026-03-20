@@ -28,10 +28,19 @@ module.exports = async function checkMembershipAccess(product, user) {
   const purchase = await MembershipPurchase.findOne({
     where: {
       userId: user.id,
-      pricingId: {
-        [Op.in]: requiredPlans,
-      },
       status: "approved",
+      [Op.or]: [
+        {
+          pricingId: {
+            [Op.in]: requiredPlans,
+          },
+        },
+        {
+          membershipId: {
+            [Op.in]: requiredPlans,
+          },
+        },
+      ],
     },
   });
 

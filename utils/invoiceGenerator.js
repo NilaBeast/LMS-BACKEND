@@ -8,13 +8,13 @@ const axios = require("axios");
 function numberToWords(num) {
 
   const a = [
-    "", "One","Two","Three","Four","Five","Six","Seven","Eight","Nine",
-    "Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen",
-    "Seventeen","Eighteen","Nineteen"
+    "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+    "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
+    "Seventeen", "Eighteen", "Nineteen"
   ];
 
   const b = [
-    "", "", "Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"
+    "", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"
   ];
 
   if ((num = num.toString()).length > 9) return "Overflow";
@@ -45,7 +45,7 @@ function numberToWords(num) {
 
   str += (n[5] != 0)
     ? ((str !== "") ? "and " : "") +
-      (a[Number(n[5])] || b[n[5][0]] + " " + a[n[5][1]]) + " "
+    (a[Number(n[5])] || b[n[5][0]] + " " + a[n[5][1]]) + " "
     : "";
 
   return str.trim();
@@ -57,6 +57,11 @@ function numberToWords(num) {
 async function downloadLogo(url, invoiceId) {
 
   if (!url) return null;
+
+  const tmpDir = path.join(__dirname, "../tmp");
+  if (!fs.existsSync(tmpDir)) {
+    fs.mkdirSync(tmpDir, { recursive: true });
+  }
 
   const logoPath = path.join(
     __dirname,
@@ -83,6 +88,11 @@ exports.generateInvoice = async ({
   amount,
   business
 }) => {
+
+  const tmpDir = path.join(__dirname, "../tmp");
+  if (!fs.existsSync(tmpDir)) {
+    fs.mkdirSync(tmpDir, { recursive: true });
+  }
 
   const filePath = path.join(
     __dirname,
@@ -264,7 +274,7 @@ exports.generateInvoice = async ({
 
   doc
     .fontSize(10)
-    .text("Name",40, totalY + 210);
+    .text("Name", 40, totalY + 210);
 
   doc.text("Authorized Signature", 40, totalY + 240);
 

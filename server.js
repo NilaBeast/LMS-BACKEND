@@ -72,6 +72,7 @@ app.use("/api/packages", packageRoutes);
 app.use("/api/memberships", membershipRoutes); // ✅ ADD THIS
 app.use("/api/enroll", enrollmentRoutes);
 app.use("/api/payment", paymentRoutes);
+app.use("/api/ai-cofounder", aiCofounderRoutes);
 // app.use("/api/webhook", webhookRoutes);
 app.use("/api/rooms", roomRoutes);
 app.use("/api/chapters", chapterRoutes);
@@ -110,7 +111,9 @@ app.get("/", (req, res) => {
 
     require("./models");
 
-    await sequelize.sync({alter: true});
+    // Keep destructive schema alteration opt-in to avoid duplicate index churn.
+    const syncOptions = process.env.DB_SYNC_ALTER === "true" ? { alter: true } : {};
+    await sequelize.sync(syncOptions);
 
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`✅ Server running on port ${PORT}`);
