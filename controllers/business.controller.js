@@ -132,6 +132,47 @@ exports.getMyBusinesses = async (req, res) => {
 
 };
 
+exports.getUserBusinesses = async (req, res) => {
+  try {
+
+    const userId = req.user.id;
+
+    /* OWNER BUSINESSES */
+    const ownerBusinesses = await Business.findAll({
+      where: { userId }
+    });
+
+    /* MEMBER BUSINESSES */
+    const memberCommunities = await CommunityMember.findAll({
+      where: { userId },
+      include: {
+        model: Community,
+        include: {
+          model: Business
+        }
+      }
+    });
+
+    const memberBusinesses = memberCommunities.map(
+      (m) => m.Community.Business
+    );
+
+    /* MERGE */
+    const allBusinesses = [
+      ...ownerBusinesses,
+      ...memberBusinesses
+    ];
+
+    res.json(allBusinesses);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      message: "Failed to fetch businesses"
+    });
+  }
+};
+
 /**
  * UPDATE BUSINESS
  * PUT /api/business/:id
