@@ -30,6 +30,9 @@ const paymentRoutes = require("./routes/payment.routes");
 const communityRoutes = require("./routes/community.routes");
 const communityPostRoutes = require("./routes/communityPost.routes");
 const communityMessageRoutes = require("./routes/communityMessage.routes");
+const businessSettingsRoutes = require("./routes/businessSettings.routes");
+const pixelSettingsRoutes = require("./routes/pixelSettings.routes");
+const planBillingRoutes = require("./routes/planBilling.routes");
 // const webhookRoutes = require("./routes/webhook.routes");
 /* ================= DB ================= */
 
@@ -66,6 +69,9 @@ app.use("/api/auth", authRoutes);
 
 /* ADMIN / AUTH */
 app.use("/api/business", businessRoutes);
+app.use("/api/business-settings", businessSettingsRoutes);
+app.use("/api/pixel-settings", pixelSettingsRoutes);
+app.use("/api/plan", planBillingRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/packages", packageRoutes);

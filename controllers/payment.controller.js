@@ -21,7 +21,7 @@ const PackagePurchase = require("../models/PackagePurchase.model");
 const SessionBooking = require("../models/SessionBooking.model");
 
 const Payment = require("../models/Payment.model");
-
+const { updateMemberCount } = require("../utils/updateMemberCount");
 const mailer = require("../services/mail.service");
 const { emailLayout } = require("../utils/emailTemplate");
 const { generateInvoice } = require("../utils/invoiceGenerator");
@@ -349,7 +349,11 @@ async function addUserToCommunity(userId, businessId, membershipId = null) {
     }
   });
 
-  if (existing) return;
+  if (existing) {
+    // still update count just in case
+    await updateMemberCount(community.id);
+    return;
+  }
 
   await CommunityMember.create({
     communityId: community.id,
@@ -358,6 +362,7 @@ async function addUserToCommunity(userId, businessId, membershipId = null) {
     membershipId
   });
 
+  await updateMemberCount(community.id);
 }
 
 /* =====================================================

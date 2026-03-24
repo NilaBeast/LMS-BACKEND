@@ -4,7 +4,7 @@ const FormData = require("form-data");
 const AIAd = require("../models/AIAd.model.js");
 const AIChat = require("../models/AIChat.model.js");
 const AILandingPage = require("../models/AILandingPage.model");
-
+const Business = require("../models/Business.model");
 const cloudinary = require("../config/cloudinary");
 
 
@@ -88,9 +88,7 @@ ${intro}
 -------------------------------- */
 
 exports.aiCofounderChat = async (req, res) => {
-
   try {
-
     const { message } = req.body;
 
     if (!req.user?.id) {
@@ -98,6 +96,59 @@ exports.aiCofounderChat = async (req, res) => {
     }
 
     const userId = req.user.id;
+
+    /* --------------------------------
+       GET USER BUSINESS
+    -------------------------------- */
+    const business = await Business.findOne({
+      where: { userId }
+    });
+
+    if (!business) {
+      return res.status(404).json({ message: "Business not found" });
+    }
+
+    let usage = business.planUsage || {
+      members: 0,
+      storageUsed: 0,
+      aiMessagesToday: 0,
+      aiLastReset: null
+    };
+
+    const today = new Date().toDateString();
+
+    /* RESET DAILY COUNT */
+    /* RESET DAILY COUNT */
+if (usage.aiLastReset !== today) {
+  usage = {
+    ...usage,
+    aiMessagesToday: 0,
+    aiLastReset: today
+  };
+}
+
+/* CHECK LIMIT */
+if ((usage.aiMessagesToday || 0) >= 5) {
+  return res.status(403).json({
+    message: "Max daily AI limit reached"
+  });
+}
+
+/* INCREMENT USAGE */
+const newUsage = {
+  ...usage,
+  aiMessagesToday: (usage.aiMessagesToday || 0) + 1
+};
+
+await business.update({
+  planUsage: newUsage
+});
+
+console.log("AI usage updated:", newUsage.aiMessagesToday);
+
+    /* --------------------------------
+       CONTINUE AI GENERATION
+    -------------------------------- */
 
     const previousAd = await AIAd.findOne({
       where: { userId },
@@ -116,57 +167,11 @@ exports.aiCofounderChat = async (req, res) => {
       lowerMessage.includes("script") ||
       lowerMessage.includes("storyline");
 
-const prompt = `
+    const prompt = `
 You are an expert Meta Ads strategist and marketing copywriter.
 
-Your job is to generate high converting social media advertisements.
-
---------------------------------
-VIDEO SCRIPT RULES
---------------------------------
-
-If the user asks for a VIDEO SCRIPT:
-
-Return ONLY a conversation style script.
-
-STRICT FORMAT RULES:
-
-- Each line MUST start with a character label.
-- Characters must be sequential:
-User1, User2, User3, User4...
-- Do NOT write descriptions, headings, or markdown.
-- Do NOT write scene explanations.
-- Only dialogue lines.
-
-Example format:
-
-User1: Did you know vaccines protect your family from serious diseases?
-User2: Really? I thought they were only for kids.
-User3: No, adults need them too! Vaccines keep communities safe.
-User1: Protect your loved ones. Get vaccinated today.
-
---------------------------------
-IMAGE AD RULES
---------------------------------
-
-If the user asks for an IMAGE AD:
-
-Return ONLY valid JSON.
-
-{
-  "brand": "",
-  "headline": "",
-  "subheadline": "",
-  "primaryText": "",
-  "description": "",
-  "cta": "",
-  "mediaType": "image",
-  "imagePrompt": ""
-}
-
---------------------------------
-CONTEXT
---------------------------------
+If user asks for VIDEO SCRIPT return only dialogue.
+If IMAGE AD return JSON.
 
 Previous Ad:
 ${previousAd ? JSON.stringify(previousAd) : "None"}
@@ -174,13 +179,9 @@ ${previousAd ? JSON.stringify(previousAd) : "None"}
 Previous Script:
 ${previousVideoScript ? previousVideoScript.response : "None"}
 
---------------------------------
-USER REQUEST
---------------------------------
-
+User Request:
 ${message}
 `;
-
 
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
@@ -201,11 +202,8 @@ ${message}
 
     const aiText = response.data?.choices?.[0]?.message?.content || "";
 
-
     /* VIDEO SCRIPT */
-
     if (isVideoRequest) {
-
       const script = aiText.replace(/```/g, "").trim();
 
       await AIChat.create({
@@ -217,11 +215,10 @@ ${message}
 
       return res.json({
         chat: script,
-        ad: null
+        ad: null,
+        remaining: 5 - usage.aiMessagesToday
       });
-
     }
-
 
     const cleaned = aiText.replace(/```json|```/g, "").trim();
 
@@ -232,7 +229,6 @@ ${message}
     } catch {
       ad = {};
     }
-
 
     ad = {
       brand: ad.brand || "Techzuno",
@@ -245,16 +241,13 @@ ${message}
       imagePrompt: ad.imagePrompt || "modern product marketing photo"
     };
 
-
     let imageUrl = null;
 
     if (ad.mediaType === "image") {
       imageUrl = await generateFluxImage(ad.imagePrompt);
     }
 
-
     const explanation = generateAdExplanation(ad);
-
 
     const savedAd = await AIAd.create({
       userId,
@@ -263,7 +256,6 @@ ${message}
       imageUrl
     });
 
-
     await AIChat.create({
       userId,
       prompt: message,
@@ -271,22 +263,19 @@ ${message}
       type: "ad"
     });
 
-
     res.json({
       chat: explanation,
-      ad: savedAd
+      ad: savedAd,
+      remaining: 5 - usage.aiMessagesToday
     });
 
   } catch (err) {
-
     console.error("AI COFOUNDER ERROR:", err);
 
     res.status(500).json({
       message: "AI generation failed"
     });
-
   }
-
 };
 
 

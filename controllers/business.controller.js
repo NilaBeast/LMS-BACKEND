@@ -13,18 +13,20 @@ const ALLOWED_CURRENCIES = [
  */
 
 exports.createBusiness = async (req, res) => {
-
   try {
 
     const {
       name,
+      description,
+      slug,
       currency = "INR",
       facebook,
       instagram,
       twitter,
       linkedin,
       youtube,
-      threads
+      threads,
+      customLinks
     } = req.body;
 
     if (!name) {
@@ -39,59 +41,52 @@ exports.createBusiness = async (req, res) => {
       });
     }
 
-    /* ================= CREATE BUSINESS ================= */
+    /* CREATE BUSINESS */
 
     const business = await Business.create({
-
       userId: req.user.id,
       name,
+      description,
+      slug,
       currency,
-      logo: req.file?.path || null,
       facebook,
       instagram,
       twitter,
       linkedin,
       youtube,
-      threads
-
+      threads,
+      customLinks: customLinks ? JSON.parse(customLinks) : [],
+      logo: req.files?.logo ? req.files.logo[0].path : null,
+      banner: req.files?.banner ? req.files.banner[0].path : null,
     });
 
-    /* ================= CREATE COMMUNITY ================= */
+    /* CREATE COMMUNITY */
 
     const community = await Community.create({
       businessId: business.id
     });
 
-    /* ================= OWNER IS ADMIN ================= */
+    /* OWNER ADMIN */
 
     await CommunityMember.create({
-
       communityId: community.id,
       userId: req.user.id,
       role: "admin"
-
     });
 
-    /* ================= 🔥 SYSTEM WELCOME POST ================= */
+    /* SYSTEM POST */
 
     await createSystemPost({
-
       communityId: community.id,
-
-      userId: req.user.id, // optional (can be null)
-
+      userId: req.user.id,
       content: `🚀 Welcome !
 
 Your community "${business.name}" is now live 🎉
 
 Start posting, engaging and growing 🔥`,
-
       gifUrl: "https://media.giphy.com/media/OkJat1YNdoD3W/giphy.gif",
       visibility: "admin"
-
     });
-
-    /* ================= RESPONSE ================= */
 
     res.status(201).json({
       business,
@@ -99,15 +94,11 @@ Start posting, engaging and growing 🔥`,
     });
 
   } catch (err) {
-
     console.error(err);
-
     res.status(500).json({
       message: "Business creation failed"
     });
-
   }
-
 };
 
 
@@ -139,4 +130,85 @@ exports.getMyBusinesses = async (req, res) => {
 
   }
 
+};
+
+/**
+ * UPDATE BUSINESS
+ * PUT /api/business/:id
+ */
+exports.updateBusiness = async (req, res) => {
+  try {
+    const businessId = req.params.id;
+
+    const {
+      name,
+      currency,
+      description,
+      slug,
+      facebook,
+      instagram,
+      twitter,
+      linkedin,
+      youtube,
+      threads,
+      customLinks
+    } = req.body;
+
+    if (currency && !ALLOWED_CURRENCIES.includes(currency)) {
+      return res.status(400).json({
+        message: "Invalid currency"
+      });
+    }
+
+    const business = await Business.findOne({
+      where: {
+        id: businessId,
+        userId: req.user.id
+      }
+    });
+
+    if (!business) {
+      return res.status(404).json({
+        message: "Business not found"
+      });
+    }
+
+    let parsedLinks = business.customLinks;
+
+try {
+  if (customLinks) {
+    parsedLinks = JSON.parse(customLinks);
+  }
+} catch (e) {
+  parsedLinks = [];
+}
+
+await business.update({
+  name,
+  currency,
+  description,
+  slug,
+  facebook,
+  instagram,
+  twitter,
+  linkedin,
+  youtube,
+  threads,
+  customLinks: parsedLinks,
+  logo: req.files?.logo
+    ? req.files.logo[0].path
+    : business.logo,
+  banner: req.files?.banner
+    ? req.files.banner[0].path
+    : business.banner,
+});
+
+    res.json(business);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      message: "Failed to update business"
+    });
+  }
 };

@@ -1,8 +1,9 @@
 const { Community, Business } = require("../models");
 
+/* ================= GET COMMUNITY ================= */
+
 exports.getCommunity = async (req, res) => {
   try {
-
     const { businessId } = req.params;
 
     const community = await Community.findOne({
@@ -15,14 +16,10 @@ exports.getCommunity = async (req, res) => {
       });
     }
 
-    /* GET BUSINESS */
-
     const business = await Business.findByPk(businessId);
 
-    /* CHECK OWNER */
-
-    const isOwner =
-      business?.userId === req.user.id;
+    // Check owner
+    const isOwner = business?.userId === req.user.id;
 
     res.json({
       ...community.toJSON(),
@@ -30,21 +27,18 @@ exports.getCommunity = async (req, res) => {
     });
 
   } catch (err) {
-
-    console.error(err);
-
+    console.error("GET COMMUNITY ERROR:", err);
     res.status(500).json({
       message: "Failed to fetch community"
     });
-
   }
 };
 
-/* ================= UPDATE SETTINGS ================= */
+
+/* ================= UPDATE COMMUNITY SETTINGS ================= */
 
 exports.updateSettings = async (req, res) => {
   try {
-
     const { communityId } = req.params;
 
     const community = await Community.findByPk(communityId);
@@ -63,12 +57,9 @@ exports.updateSettings = async (req, res) => {
     });
 
   } catch (err) {
-
     console.error("UPDATE COMMUNITY ERROR:", err);
-
     res.status(500).json({
       message: "Update failed",
     });
-
   }
 };

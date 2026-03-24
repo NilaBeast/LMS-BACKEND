@@ -25,11 +25,51 @@ const business = sequelize.define(
       type: DataTypes.STRING, // Cloudinary URL
     },
 
+    description: DataTypes.TEXT,
+banner: DataTypes.STRING,
+slug: DataTypes.STRING,
+layout: {
+  type: DataTypes.STRING,
+  defaultValue: "stacked"
+},
+
     currency: {
       type: DataTypes.STRING,
       defaultValue: "INR",
     },
 
+    emailPreferences: {
+  type: DataTypes.JSON,
+  defaultValue: {
+    newMember: true,
+    memberLeave: true,
+    dailySummary: true,
+    newChallenge: true,
+    newAffiliate: true,
+    inventoryLow: true,
+    outOfStock: true
+  }
+},
+
+pixelSettings: {
+  type: DataTypes.JSON,
+  defaultValue: {
+    metaPixelId: "",
+    metaAccessToken: "",
+    googleMeasurementId: "",
+    googleAccessToken: ""
+  }
+},
+
+planUsage: {
+  type: DataTypes.JSON,
+  defaultValue: {
+    members: 0,
+    storageUsed: 0,
+    aiMessagesToday: 0,
+    aiLastReset: null
+  }
+},
     facebook: DataTypes.STRING,
     instagram: DataTypes.STRING,
     twitter: DataTypes.STRING,

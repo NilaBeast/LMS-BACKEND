@@ -7,6 +7,7 @@ const upload = require("../middlewares/upload.middleware");
 const {
   createBusiness,
   getMyBusinesses,
+  updateBusiness
 } = require("../controllers/business.controller");
 
 /**
@@ -16,12 +17,29 @@ const {
 router.post(
   "/admin/business",
   protect,
-  upload.single("logo"),
+  upload.fields([
+    { name: "logo", maxCount: 1 },
+    { name: "banner", maxCount: 1 }
+  ]),
   createBusiness
 );
 
 /**
- * ✅ GET ALL MY BUSINESSES
+ * UPDATE BUSINESS (logo + banner + links + description + slug)
+ * PUT /api/business/:id
+ */
+router.put(
+  "/:id",
+  protect,
+  upload.fields([
+    { name: "logo", maxCount: 1 },
+    { name: "banner", maxCount: 1 }
+  ]),
+  updateBusiness
+);
+
+/**
+ * GET ALL MY BUSINESSES
  * GET /api/business/my
  */
 router.get("/my", protect, getMyBusinesses);
