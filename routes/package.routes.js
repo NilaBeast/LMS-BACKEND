@@ -35,19 +35,24 @@ router.delete("/product/:productId", protect, deletePackage);
 
 router.get("/my", protect, async (req, res) => {
   try {
+    const { businessId } = req.query;
+
+    if (!businessId) {
+      return res.status(400).json({ message: "businessId required" });
+    }
+
     const packages = await Package.findAll({
       include: [
         {
           model: Product,
           where: {
             type: "package",
+            businessId: businessId,
           },
           include: [
             {
               model: Business,
-              where: {
-                userId: req.user.id,
-              },
+              where: { userId: req.user.id },
             },
           ],
         },
@@ -56,14 +61,9 @@ router.get("/my", protect, async (req, res) => {
     });
 
     res.json(packages);
-
   } catch (err) {
     console.error("MY PACKAGES ERROR:", err);
-
-    res.status(500).json({
-      message: "Failed to load packages",
-      error: err.message,
-    });
+    res.status(500).json({ message: "Failed" });
   }
 });
 

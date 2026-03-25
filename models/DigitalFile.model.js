@@ -16,6 +16,8 @@ const DigitalFile = sequelize.define(
       unique: true,
     },
 
+    
+
     title: {
       type: DataTypes.STRING,
       allowNull: false,

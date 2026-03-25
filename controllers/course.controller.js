@@ -113,63 +113,9 @@ const product = await Product.create(
  */
 exports.getMyCourses = async (req, res) => {
   try {
-    // 🔹 Get all businesses of user
-    const businesses = await Business.findAll({
-      where: { userId: req.user.id },
-    });
-
-    if (businesses.length === 0) {
-      return res.json([]);
-    }
-
-    const businessIds = businesses.map((b) => b.id);
-
-    // 🔹 Get products for all businesses
-    const products = await Product.findAll({
-      where: {
-        businessId: businessIds,
-        type: "course",
-      },
-      order: [["createdAt", "DESC"]],
-    });
-
-    if (products.length === 0) {
-      return res.json([]);
-    }
-
-    const productIds = products.map((p) => p.id);
+    const { businessId } = req.query;
 
     const courses = await Course.findAll({
-      where: { productId: productIds },
-      order: [["createdAt", "DESC"]],
-    });
-
-    // 🔹 Attach Product to Course
-    const merged = courses.map((course) => {
-      const product = products.find(
-        (p) => p.id === course.productId
-      );
-
-      return {
-        ...course.toJSON(),
-        Product: product,
-      };
-    });
-
-    res.json(merged);
-  } catch (err) {
-    console.error("GET MY COURSES ERROR:", err);
-    res.status(500).json({ message: "Failed to fetch courses" });
-  }
-};
-
-/**
- * GET SINGLE COURSE (BUSINESS SCOPED)
- */
-exports.getCourseById = async (req, res) => {
-  try {
-    const course = await Course.findOne({
-      where: { id: req.params.id },
       include: [
         {
           model: Product,
@@ -177,7 +123,60 @@ exports.getCourseById = async (req, res) => {
           include: [
             {
               model: Business,
-              where: { userId: req.user.id },
+              required: true,
+              where: {
+                id: businessId,
+                userId: req.user.id,
+              },
+            },
+          ],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.json(courses);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed" });
+  }
+};
+
+/**
+ * GET SINGLE COURSE (BUSINESS SCOPED - FIXED)
+ */
+exports.getCourseById = async (req, res) => {
+  try {
+    const { businessId } = req.query;
+
+    if (!businessId) {
+      return res.status(400).json({ message: "businessId query parameter required" });
+    }
+
+    const business = await Business.findOne({
+      where: {
+        id: businessId,
+        userId: req.user.id,
+      },
+    });
+
+    if (!business) {
+      return res.status(404).json({ message: "Business not found or access denied" });
+    }
+
+    const course = await Course.findOne({
+      where: { id: req.params.id },
+      include: [
+        {
+          model: Product,
+          required: true,
+          where: {
+            businessId: businessId,
+          },
+          include: [
+            {
+              model: Business,
+              where: { id: businessId },
             },
           ],
         },
@@ -216,6 +215,23 @@ exports.updateCourse = async (req, res) => {
       accessDays,
     } = req.body;
 
+    const { businessId } = req.body;
+
+    if (!businessId) {
+      return res.status(400).json({ message: "businessId required in request body" });
+    }
+
+    const business = await Business.findOne({
+      where: {
+        id: businessId,
+        userId: req.user.id,
+      },
+    });
+
+    if (!business) {
+      return res.status(404).json({ message: "Business not found or access denied" });
+    }
+
     const parsedPricing =
       pricing !== undefined
         ? typeof pricing === "string"
@@ -229,10 +245,14 @@ exports.updateCourse = async (req, res) => {
         {
           model: Product,
           required: true,
+          where: {
+            id: course.productId,
+            businessId: businessId,
+          },
           include: [
             {
               model: Business,
-              where: { userId: req.user.id },
+              where: { id: businessId },
             },
           ],
         },
@@ -379,22 +399,89 @@ exports.deleteCourse = async (req, res) => {
 };
 
 exports.getCourseMoreInfo = async (req, res) => {
-  const course = await Course.findByPk(req.params.id);
+  try {
+    const { businessId } = req.query;
 
-  res.json({
-    settings: course.courseSettings,
-    pricing: course.pricing,
-    room: course.hasRoom,
-    breakdown: course.pricingBreakdown,
-  });
+    if (!businessId) {
+      return res.status(400).json({ message: "businessId query parameter required" });
+    }
+
+    const business = await Business.findOne({
+      where: {
+        id: businessId,
+        userId: req.user.id,
+      },
+    });
+
+    if (!business) {
+      return res.status(404).json({ message: "Business not found or access denied" });
+    }
+
+    const course = await Course.findByPk(req.params.id, {
+      include: [
+        {
+          model: Product,
+          required: true,
+          where: { businessId: businessId },
+        },
+      ],
+    });
+
+    if (!course) {
+      return res.status(404).json({ message: "Course not found" });
+    }
+
+    res.json({
+      settings: course.courseSettings,
+      pricing: course.pricing,
+      room: course.hasRoom,
+      breakdown: course.pricingBreakdown,
+    });
+  } catch (err) {
+    console.error("GET COURSE MORE INFO ERROR:", err);
+    res.status(500).json({ message: "Failed to fetch course info" });
+  }
 };
 
 exports.updateCourseSettings = async (req, res) => {
-  const course = await Course.findByPk(req.params.id);
+  try {
+    const { businessId } = req.query;
 
-  course.courseSettings = req.body;
+    if (!businessId) {
+      return res.status(400).json({ message: "businessId query parameter required" });
+    }
 
-  await course.save();
+    const business = await Business.findOne({
+      where: {
+        id: businessId,
+        userId: req.user.id,
+      },
+    });
 
-  res.json(course.courseSettings);
+    if (!business) {
+      return res.status(404).json({ message: "Business not found or access denied" });
+    }
+
+    const course = await Course.findByPk(req.params.id, {
+      include: [
+        {
+          model: Product,
+          required: true,
+          where: { businessId: businessId },
+        },
+      ],
+    });
+
+    if (!course) {
+      return res.status(404).json({ message: "Course not found" });
+    }
+
+    course.courseSettings = req.body;
+    await course.save();
+
+    res.json(course.courseSettings);
+  } catch (err) {
+    console.error("UPDATE COURSE SETTINGS ERROR:", err);
+    res.status(500).json({ message: "Failed to update settings" });
+  }
 };

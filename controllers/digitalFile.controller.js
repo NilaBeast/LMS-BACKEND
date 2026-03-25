@@ -91,29 +91,37 @@ const product = await Product.create({
 /* ================= DASHBOARD ================= */
 
 exports.getMyDigitalFiles = async (req, res) => {
+  try {
+    const { businessId } = req.query;
 
-  const businesses = await Business.findAll({
-    where: { userId: req.user.id },
-  });
+    if (!businessId) {
+      return res.status(400).json({ message: "businessId required" });
+    }
 
-  const ids = businesses.map(b => b.id);
+    const files = await DigitalFile.findAll({
+      include: [
+        {
+          model: Product,
+          where: {
+            businessId: businessId,
+            type: "digital",
+          },
+          include: [
+            {
+              model: Business,
+              where: { userId: req.user.id },
+            },
+          ],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
 
-  const products = await Product.findAll({
-    where: {
-      businessId: ids,
-      type: "digital",
-    },
-  });
-
-  const productIds = products.map(p => p.id);
-
-  const files = await DigitalFile.findAll({
-    where: { productId: productIds },
-    include: [Product],
-    order: [["createdAt", "DESC"]],
-  });
-
-  res.json(files);
+    res.json(files);
+  } catch (err) {
+    console.error("GET MY DIGITAL FILES ERROR:", err);
+    res.status(500).json({ message: "Failed" });
+  }
 };
 
 

@@ -197,29 +197,27 @@ exports.updateMembership = async (req, res) => {
 /*====================GET ALL MEMBERSHIPS=============*/
 exports.getMyMemberships = async (req, res) => {
   try {
-    // Step 1: Find business owned by user
-    const business = await Business.findOne({
-      where: { userId: req.user.id },
-    });
+    const { businessId } = req.query;
 
-    if (!business) {
-      return res.status(404).json({
-        message: "Business not found",
-      });
+    if (!businessId) {
+      return res.status(400).json({ message: "businessId required" });
     }
 
-    // Step 2: Get memberships under that business
     const memberships = await Membership.findAll({
       include: [
-        {
-          model: MembershipPricing,
-        },
+        MembershipPricing,
         {
           model: Product,
           where: {
-            businessId: business.id,
+            businessId: businessId,
             type: "membership",
           },
+          include: [
+            {
+              model: Business,
+              where: { userId: req.user.id },
+            },
+          ],
         },
       ],
       order: [["createdAt", "DESC"]],
@@ -227,10 +225,8 @@ exports.getMyMemberships = async (req, res) => {
 
     res.json(memberships);
   } catch (err) {
-    console.error("GET MEMBERSHIPS ERROR:", err);
-    res.status(500).json({
-      message: "Failed to load memberships",
-    });
+    console.error("GET MY MEMBERSHIPS ERROR:", err);
+    res.status(500).json({ message: "Failed" });
   }
 };
 

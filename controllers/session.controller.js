@@ -144,15 +144,10 @@ const product = await Product.create({
 
 exports.getMySessions = async (req, res) => {
   try {
+    const { businessId } = req.query;
 
-    const business = await Business.findOne({
-      where: { userId: req.user.id },
-    });
-
-    if (!business) {
-      return res.status(404).json({
-        message: "Business not found",
-      });
+    if (!businessId) {
+      return res.status(400).json({ message: "businessId required" });
     }
 
     const sessions = await Session.findAll({
@@ -160,23 +155,24 @@ exports.getMySessions = async (req, res) => {
         {
           model: Product,
           where: {
-            businessId: business.id,
+            businessId: businessId,
             type: "session",
           },
+          include: [
+            {
+              model: Business,
+              where: { userId: req.user.id },
+            },
+          ],
         },
       ],
       order: [["createdAt", "DESC"]],
     });
 
     res.json(sessions);
-
   } catch (err) {
-
     console.error("GET MY SESSIONS ERROR:", err);
-
-    res.status(500).json({
-      message: "Failed to fetch sessions",
-    });
+    res.status(500).json({ message: "Failed" });
   }
 };
 

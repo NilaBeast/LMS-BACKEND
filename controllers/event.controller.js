@@ -588,48 +588,37 @@ exports.approveRegistration = async (req, res) => {
 /* ================= GET MY EVENTS ================= */
 
 exports.getMyEvents = async (req, res) => {
-
   try {
+    const { businessId } = req.query;
+
+    if (!businessId) {
+      return res.status(400).json({ message: "businessId required" });
+    }
 
     const events = await Event.findAll({
-
       include: [
-
         {
           model: Product,
           required: true,
-
+          where: {
+            type: "event",
+            businessId: businessId,
+          },
           include: [
             {
               model: Business,
-              where: {
-                userId: req.user.id,
-              },
+              where: { userId: req.user.id },
             },
           ],
         },
-
-        {
-          model: User,
-          as: "host",
-          attributes: ["id", "name", "email"],
-        },
-
       ],
-
       order: [["createdAt", "DESC"]],
     });
 
-
     res.json(events);
-
   } catch (err) {
-
-    console.error("MY EVENTS:", err);
-
-    res.status(500).json({
-      message: "Load failed",
-    });
+    console.error("GET MY EVENTS ERROR:", err);
+    res.status(500).json({ message: "Failed" });
   }
 };
 

@@ -14,6 +14,8 @@ const Course = sequelize.define("Course", {
     unique: true,
   },
 
+  
+
   name: {
     type: DataTypes.STRING,
     allowNull: false,

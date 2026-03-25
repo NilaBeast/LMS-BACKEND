@@ -20,6 +20,8 @@ const Membership = sequelize.define("Membership", {
     allowNull: false,
   },
 
+  
+
 //   businessId:{
 //   type:DataTypes.UUID,
 //   allowNull:false

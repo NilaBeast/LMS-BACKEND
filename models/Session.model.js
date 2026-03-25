@@ -14,6 +14,8 @@ const Session = sequelize.define("Session", {
     allowNull: false,
   },
 
+  
+
   title: DataTypes.STRING,
 
   description: DataTypes.TEXT,

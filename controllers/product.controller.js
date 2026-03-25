@@ -11,23 +11,38 @@ const { emailLayout } = require("../utils/emailTemplate");
  */
 exports.getMyProducts = async (req, res) => {
   try {
+    const { businessId } = req.query;
+
+    if (!businessId) {
+      return res.status(400).json({
+        message: "businessId required",
+      });
+    }
+
     const business = await Business.findOne({
-      where: { userId: req.user.id },
+      where: {
+        id: businessId,
+        userId: req.user.id,
+      },
     });
 
     if (!business) {
-      return res.status(404).json({ message: "Business not found" });
+      return res.status(404).json({
+        message: "Business not found",
+      });
     }
 
     const products = await Product.findAll({
-      where: { businessId: business.id },
+      where: { businessId: businessId },
       order: [["createdAt", "DESC"]],
     });
 
     res.json(products);
   } catch (err) {
     console.error("GET PRODUCTS ERROR:", err);
-    res.status(500).json({ message: "Failed to fetch products" });
+    res.status(500).json({
+      message: "Failed to fetch products",
+    });
   }
 };
 
@@ -36,29 +51,40 @@ exports.getMyProducts = async (req, res) => {
  */
 exports.getProductById = async (req, res) => {
   try {
+    const { businessId } = req.query;
+
     const business = await Business.findOne({
-      where: { userId: req.user.id },
+      where: {
+        id: businessId,
+        userId: req.user.id,
+      },
     });
 
     if (!business) {
-      return res.status(404).json({ message: "Business not found" });
+      return res.status(404).json({
+        message: "Business not found",
+      });
     }
 
     const product = await Product.findOne({
       where: {
         id: req.params.id,
-        businessId: business.id,
+        businessId: businessId,
       },
     });
 
     if (!product) {
-      return res.status(404).json({ message: "Product not found" });
+      return res.status(404).json({
+        message: "Product not found",
+      });
     }
 
     res.json(product);
   } catch (err) {
     console.error("GET PRODUCT ERROR:", err);
-    res.status(500).json({ message: "Failed to fetch product" });
+    res.status(500).json({
+      message: "Failed to fetch product",
+    });
   }
 };
 
@@ -84,9 +110,14 @@ exports.updateProductStatus = async (req, res) => {
 
     /* ================= VERIFY BUSINESS ================= */
 
-    const business = await Business.findOne({
-      where: { userId: req.user.id },
-    });
+    const { businessId } = req.body;
+
+const business = await Business.findOne({
+  where: {
+    id: businessId,
+    userId: req.user.id,
+  },
+});
 
     if (!business) {
       return res.status(404).json({
