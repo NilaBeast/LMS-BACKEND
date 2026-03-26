@@ -6,6 +6,7 @@ const {
   MembershipQuestionOption,
   MembershipAnswer,
   MembershipPurchase,
+  CommunityMember,
   Product,
   Business,
 } = require("../models");
@@ -42,6 +43,7 @@ exports.createMembership = async (req, res) => {
       {
         businessId: business.id,
         type: "membership",
+        status: "published"
       },
       { transaction }
     );
@@ -57,8 +59,7 @@ exports.createMembership = async (req, res) => {
       { transaction }
     );
 
-    /* ================= HANDLE PRICING ================= */
-
+    /* HANDLE PRICING */
     if (pricingOptions) {
       const parsed =
         typeof pricingOptions === "string"
@@ -67,23 +68,18 @@ exports.createMembership = async (req, res) => {
 
       for (const plan of parsed) {
         const price = Number(plan.price) || 0;
-
-        const hasDiscount = !!plan.hasDiscount;
-
-        const discountValue =
-          hasDiscount && plan.discountValue !== ""
-            ? Number(plan.discountValue) || 0
-            : 0;
+        const isFree = price === 0;
 
         await MembershipPricing.create(
           {
             membershipId: membership.id,
-            interval: plan.interval,
+            interval: isFree ? "free" : plan.interval,
             duration: Number(plan.duration) || 1,
             price,
-            hasDiscount,
+            isFree,
+            hasDiscount: isFree ? false : !!plan.hasDiscount,
             discountType: plan.discountType || "percentage",
-            discountValue,
+            discountValue: Number(plan.discountValue) || 0,
           },
           { transaction }
         );
@@ -143,42 +139,35 @@ exports.updateMembership = async (req, res) => {
     /* ================= HANDLE PRICING ================= */
 
     if (pricingOptions) {
-      const parsed =
-        typeof pricingOptions === "string"
-          ? JSON.parse(pricingOptions)
-          : pricingOptions;
+  const parsed =
+    typeof pricingOptions === "string"
+      ? JSON.parse(pricingOptions)
+      : pricingOptions;
 
-      /* 1️⃣ Delete old pricing */
-      await MembershipPricing.destroy({
-        where: { membershipId: membership.id },
-        transaction,
-      });
+  await MembershipPricing.destroy({
+    where: { membershipId: membership.id },
+    transaction,
+  });
 
-      /* 2️⃣ Recreate pricing safely */
-      for (const plan of parsed) {
-        const price = Number(plan.price) || 0;
+  for (const plan of parsed) {
+    const price = Number(plan.price) || 0;
+    const isFree = price === 0;
 
-        const hasDiscount = !!plan.hasDiscount;
-
-        const discountValue =
-          hasDiscount && plan.discountValue !== ""
-            ? Number(plan.discountValue) || 0
-            : 0;
-
-        await MembershipPricing.create(
-          {
-            membershipId: membership.id,
-            interval: plan.interval,
-            duration: Number(plan.duration) || 1,
-            price,
-            hasDiscount,
-            discountType: plan.discountType || "percentage",
-            discountValue,
-          },
-          { transaction }
-        );
-      }
-    }
+    await MembershipPricing.create(
+      {
+        membershipId: membership.id,
+        interval: isFree ? "free" : plan.interval,
+        duration: Number(plan.duration) || 1,
+        price,
+        isFree,
+        hasDiscount: isFree ? false : !!plan.hasDiscount,
+        discountType: plan.discountType || "percentage",
+        discountValue: Number(plan.discountValue) || 0,
+      },
+      { transaction }
+    );
+  }
+}
 
     await transaction.commit();
 
@@ -282,39 +271,67 @@ exports.deleteMembership = async (req, res) => {
     const membershipId = membership.id;
     const productId = membership.productId;
 
-    /* Delete membership answers */
-    await MembershipAnswer.destroy({
-      where: { purchaseId: sequelize.literal(
-        `(SELECT id FROM membership_purchases WHERE membershipId='${membershipId}')`
-      )},
-      transaction,
+    /* DELETE ANSWERS */
+    const purchases = await MembershipPurchase.findAll({
+      where: { membershipId },
+      transaction
     });
 
-    /* Delete membership purchases */
+    const purchaseIds = purchases.map(p => p.id);
+
+    if (purchaseIds.length) {
+      await MembershipAnswer.destroy({
+        where: { purchaseId: purchaseIds },
+        transaction
+      });
+    }
+
+    /* DELETE PURCHASES */
     await MembershipPurchase.destroy({
       where: { membershipId },
-      transaction,
+      transaction
     });
 
-    /* Delete membership questions */
+    /* DELETE QUESTION OPTIONS */
+    const questions = await MembershipQuestion.findAll({
+      where: { membershipId },
+      transaction
+    });
+
+    const questionIds = questions.map(q => q.id);
+
+    if (questionIds.length) {
+      await MembershipQuestionOption.destroy({
+        where: { questionId: questionIds },
+        transaction
+      });
+    }
+
+    /* DELETE QUESTIONS */
     await MembershipQuestion.destroy({
       where: { membershipId },
-      transaction,
+      transaction
     });
 
-    /* Delete pricing */
+    /* DELETE PRICING */
     await MembershipPricing.destroy({
       where: { membershipId },
-      transaction,
+      transaction
     });
 
-    /* Delete membership */
+    /* REMOVE MEMBERS FROM COMMUNITY */
+    await CommunityMember.destroy({
+      where: { membershipId },
+      transaction
+    });
+
+    /* DELETE MEMBERSHIP */
     await membership.destroy({ transaction });
 
-    /* Delete product */
+    /* DELETE PRODUCT */
     await Product.destroy({
       where: { id: productId },
-      transaction,
+      transaction
     });
 
     await transaction.commit();

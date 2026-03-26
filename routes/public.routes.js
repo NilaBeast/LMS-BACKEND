@@ -14,7 +14,8 @@ const Chapter = require("../models/Chapter.model");
 const Content = require("../models/Content.model");
 
 const DigitalFile = require("../models/DigitalFile.model");
-
+const Community = require("../models/Community.model");
+const CommunityMember = require("../models/CommunityMember.model");
 const Package = require("../models/Package.model");
 const PackagePurchase = require("../models/PackagePurchase.model");
 
@@ -23,7 +24,7 @@ const MembershipPricing = require("../models/MembershipPricing.model");
 const MembershipQuestion = require("../models/MembershipQuestion.model");
 const MembershipQuestionOption = require("../models/MembershipQuestionOption.model");
 const MembershipPurchase = require("../models/MembershipPurchase.model");
-
+const Business = require("../models/Business.model");
 const { protectOptional } = require("../middlewares/auth.middleware");
 const checkMembershipAccess = require("../utils/checkMembershipAccess");
 
@@ -513,6 +514,73 @@ router.get("/memberships/:id", protectOptional, async (req, res) => {
 
   }
 
+});
+
+/* =======================================================
+   BUSINESS BY SLUG (NEW)
+======================================================= */
+
+router.get("/business/:slug", protectOptional, async (req, res) => {
+  try {
+
+    const business = await Business.findOne({
+      where: { slug: req.params.slug },
+      include: [
+        {
+          model: Product,
+          include: [
+            {
+              model: Membership,
+              include: [
+                MembershipPricing,
+                {
+                  model: MembershipQuestion,
+                  include: [MembershipQuestionOption],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!business) {
+      return res.status(404).json({
+        message: "Business not found",
+      });
+    }
+
+    /* CHECK IF USER IS MEMBER */
+    let isMember = false;
+
+    if (req.user) {
+      const community = await Community.findOne({
+        where: { businessId: business.id }
+      });
+
+      if (community) {
+        const member = await CommunityMember.findOne({
+          where: {
+            communityId: community.id,
+            userId: req.user.id
+          }
+        });
+
+        if (member) isMember = true;
+      }
+    }
+
+    res.json({
+      ...business.toJSON(),
+      isMember
+    });
+
+  } catch (err) {
+    console.error("PUBLIC BUSINESS ERROR:", err);
+    res.status(500).json({
+      message: "Load failed",
+    });
+  }
 });
 
 

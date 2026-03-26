@@ -15,6 +15,7 @@ const MembershipPricing = sequelize.define("MembershipPricing", {
 
   interval: {
     type: DataTypes.ENUM(
+      "free",
       "weekly",
       "monthly",
       "quarterly",
@@ -23,9 +24,20 @@ const MembershipPricing = sequelize.define("MembershipPricing", {
     ),
   },
 
-  duration: DataTypes.INTEGER, // number of weeks/months/etc
+  duration: {
+    type: DataTypes.INTEGER,
+    defaultValue: 1
+  },
 
-  price: DataTypes.FLOAT,
+  price: {
+    type: DataTypes.FLOAT,
+    defaultValue: 0
+  },
+
+  isFree: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
 
   hasDiscount: {
     type: DataTypes.BOOLEAN,
@@ -37,7 +49,11 @@ const MembershipPricing = sequelize.define("MembershipPricing", {
     allowNull: true,
   },
 
-  discountValue: DataTypes.FLOAT,
+  discountValue: {
+    type: DataTypes.FLOAT,
+    defaultValue: 0
+  }
+
 }, {
   tableName: "membership_pricing",
   timestamps: true,

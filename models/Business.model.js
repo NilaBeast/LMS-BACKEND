@@ -61,6 +61,14 @@ pixelSettings: {
   }
 },
 
+inviteToken: {
+  type: DataTypes.STRING,
+},
+slug: {
+  type: DataTypes.STRING,
+  unique: true
+},
+
 planUsage: {
   type: DataTypes.JSON,
   defaultValue: {

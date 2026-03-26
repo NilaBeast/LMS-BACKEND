@@ -548,10 +548,17 @@ Membership.belongsTo(Product, {
   foreignKey: "productId",
 });
 
+Business.hasMany(Product, { foreignKey: "businessId" });
+Product.belongsTo(Business, { foreignKey: "businessId" });
+
 /* MEMBERSHIP → PRICING */
 Membership.hasMany(MembershipPricing, {
   foreignKey: "membershipId",
   onDelete: "CASCADE",
+});
+Membership.hasMany(MembershipPurchase, {
+  foreignKey: "membershipId",
+  onDelete: "CASCADE"
 });
 MembershipPricing.belongsTo(Membership, {
   foreignKey: "membershipId",

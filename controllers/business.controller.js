@@ -2,7 +2,8 @@ const Business = require("../models/Business.model");
 const Community = require("../models/Community.model");
 const CommunityMember = require("../models/CommunityMember.model");
 const { createSystemPost } = require("../utils/systemPost");
-
+const { generateInviteToken } = require("../utils/inviteToken");
+const slugify = require("../utils/slugify");
 const ALLOWED_CURRENCIES = [
   "INR","USD","EUR","GBP","JPY","AUD","CAD","SGD",
   "AED","SAR","ZAR","CNY","HKD","NZD","CHF"
@@ -14,11 +15,9 @@ const ALLOWED_CURRENCIES = [
 
 exports.createBusiness = async (req, res) => {
   try {
-
     const {
       name,
       description,
-      slug,
       currency = "INR",
       facebook,
       instagram,
@@ -35,14 +34,23 @@ exports.createBusiness = async (req, res) => {
       });
     }
 
-    if (!ALLOWED_CURRENCIES.includes(currency)) {
-      return res.status(400).json({
-        message: "Invalid currency"
-      });
+    /* AUTO GENERATE SLUG */
+    let slug = slugify(name);
+
+    /* ENSURE UNIQUE SLUG */
+    let existing = await Business.findOne({ where: { slug } });
+    let counter = 1;
+
+    while (existing) {
+      slug = `${slugify(name)}-${counter}`;
+      existing = await Business.findOne({ where: { slug } });
+      counter++;
     }
 
-    /* CREATE BUSINESS */
+    /* GENERATE INVITE TOKEN */
+    const inviteToken = generateInviteToken();
 
+    /* CREATE BUSINESS */
     const business = await Business.create({
       userId: req.user.id,
       name,
@@ -55,19 +63,18 @@ exports.createBusiness = async (req, res) => {
       linkedin,
       youtube,
       threads,
+      inviteToken,
       customLinks: customLinks ? JSON.parse(customLinks) : [],
       logo: req.files?.logo ? req.files.logo[0].path : null,
       banner: req.files?.banner ? req.files.banner[0].path : null,
     });
 
     /* CREATE COMMUNITY */
-
     const community = await Community.create({
       businessId: business.id
     });
 
     /* OWNER ADMIN */
-
     await CommunityMember.create({
       communityId: community.id,
       userId: req.user.id,
@@ -75,22 +82,23 @@ exports.createBusiness = async (req, res) => {
     });
 
     /* SYSTEM POST */
-
     await createSystemPost({
       communityId: community.id,
       userId: req.user.id,
       content: `🚀 Welcome !
 
-Your community "${business.name}" is now live 🎉
-
-Start posting, engaging and growing 🔥`,
+Your community "${business.name}" is now live 🎉`,
       gifUrl: "https://media.giphy.com/media/OkJat1YNdoD3W/giphy.gif",
       visibility: "admin"
     });
 
+    /* INVITE LINK */
+    const inviteLink = `${process.env.FRONTEND_URL}/${slug}`;
+
     res.status(201).json({
       business,
-      community
+      community,
+      inviteLink
     });
 
   } catch (err) {
@@ -107,29 +115,25 @@ Start posting, engaging and growing 🔥`,
  */
 
 exports.getMyBusinesses = async (req, res) => {
-
   try {
-
     const businesses = await Business.findAll({
-
       where: { userId: req.user.id },
-
-      order: [["createdAt", "DESC"]]
-
+      order: [["createdAt", "DESC"]],
     });
 
-    res.json(businesses);
+    const data = businesses.map((b) => ({
+      ...b.toJSON(),
+      inviteLink: `${process.env.FRONTEND_URL}/${b.slug}`
+    }));
+
+    res.json(data);
 
   } catch (err) {
-
     console.error(err);
-
     res.status(500).json({
       message: "Failed to fetch businesses"
     });
-
   }
-
 };
 
 exports.getUserBusinesses = async (req, res) => {

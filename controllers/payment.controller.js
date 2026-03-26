@@ -149,31 +149,25 @@ exports.createOrder = async (req, res) => {
 
     /* ================= MEMBERSHIP ================= */
 
-    if (productType === "membership") {
-      const membership = await Membership.findByPk(productId, {
-        include: [MembershipPricing],
-      });
+    /* ================= MEMBERSHIP ================= */
 
-      if (!membership) {
-        return res.status(404).json({ message: "Membership not found" });
-      }
+if (productType === "membership") {
+  if (!pricingId) {
+    return res.status(400).json({
+      message: "pricingId required for membership",
+    });
+  }
 
-      let plan = null;
+  const plan = await MembershipPricing.findByPk(pricingId);
 
-      if (pricingId) {
-        plan = membership.MembershipPricings?.find((item) => item.id === pricingId);
-      }
+  if (!plan) {
+    return res.status(400).json({
+      message: "Membership pricing not found",
+    });
+  }
 
-      if (!plan) {
-        plan = membership.MembershipPricings?.[0];
-      }
-
-      if (!plan) {
-        return res.status(400).json({ message: "Membership pricing not found" });
-      }
-
-      amount = plan.price;
-    }
+  amount = plan.price;
+}
 
     if (amount <= 0) {
       return res.status(400).json({

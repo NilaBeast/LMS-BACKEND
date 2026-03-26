@@ -6,20 +6,32 @@ const {
   MembershipQuestion,
   User,
   Product,
+  Business,
+  Community,
+  CommunityMember
 } = require("../models");
 
 const mailer = require("../services/mail.service");
 const { emailLayout } = require("../utils/emailTemplate");
+const { generateInvoice } = require("../utils/invoiceGenerator");
+const fs = require("fs");
 
 
 /* =========================================
-   PURCHASE MEMBERSHIP
+   PURCHASE MEMBERSHIP (FREE + PAID + INVOICE)
 ========================================= */
 exports.purchaseMembership = async (req, res) => {
   try {
     const { membershipId, pricingId, answers } = req.body;
 
-    const membership = await Membership.findByPk(membershipId);
+    const membership = await Membership.findByPk(membershipId, {
+      include: [
+        {
+          model: Product,
+          include: [Business]
+        }
+      ]
+    });
 
     if (!membership) {
       return res.status(404).json({ message: "Membership not found" });
@@ -31,14 +43,37 @@ exports.purchaseMembership = async (req, res) => {
       return res.status(404).json({ message: "Pricing not found" });
     }
 
+    /* CHECK IF ALREADY PURCHASED */
+    const existing = await MembershipPurchase.findOne({
+      where: {
+        userId: req.user.id,
+        membershipId
+      }
+    });
+
+    if (existing) {
+      return res.json({
+        message: "Already purchased",
+        purchase: existing
+      });
+    }
+
+    /* DETERMINE STATUS */
+    let status = "approved";
+
+    if (membership.requireApproval) {
+      status = "pending";
+    }
+
+    /* CREATE PURCHASE */
     const purchase = await MembershipPurchase.create({
       userId: req.user.id,
       membershipId,
       pricingId,
-      status: membership.requireApproval ? "pending" : "approved",
+      status
     });
 
-    /* Save answers */
+    /* SAVE ANSWERS */
     if (answers?.length) {
       for (const ans of answers) {
         await MembershipAnswer.create({
@@ -49,24 +84,82 @@ exports.purchaseMembership = async (req, res) => {
       }
     }
 
-    /* SEND EMAIL */
+    /* AUTO JOIN BUSINESS IF APPROVED */
+    if (status === "approved") {
+      const businessId = membership.Product.businessId;
+
+      const community = await Community.findOne({
+        where: { businessId }
+      });
+
+      if (community) {
+        const existingMember = await CommunityMember.findOne({
+          where: {
+            communityId: community.id,
+            userId: req.user.id
+          }
+        });
+
+        if (!existingMember) {
+          await CommunityMember.create({
+            communityId: community.id,
+            userId: req.user.id,
+            role: "member"
+          });
+        }
+      }
+    }
+
+    /* ================= GENERATE INVOICE ================= */
+
+    let invoicePath = null;
+
+    if (pricing.price > 0) {
+      invoicePath = await generateInvoice({
+        invoiceId: purchase.id,
+        customerName: req.user.name,
+        itemName: membership.title + " Membership",
+        amount: pricing.price,
+        business: membership.Product.Business
+      });
+    }
+
+    /* ================= SEND EMAIL ================= */
+
     const html = emailLayout(
       "Membership Confirmation",
       `
-      <h2>Membership Purchase Confirmation</h2>
+      <h2>Membership Confirmation</h2>
       <p>Hi ${req.user.name},</p>
-      <p>You purchased <strong>${membership.title} Membership</strong>.</p>
-      <p>Status: <strong>${purchase.status.toUpperCase()}</strong></p>
+      <p>You joined <strong>${membership.title}</strong>.</p>
+      <p>Status: <strong>${status.toUpperCase()}</strong></p>
+      ${pricing.price > 0 ? "<p>Invoice attached.</p>" : ""}
       `
     );
 
-    mailer.sendMail(
+    await mailer.sendMail(
       req.user.email,
-      "Membership Purchase Confirmation",
-      html
+      "Membership Confirmation",
+      html,
+      invoicePath
+        ? [
+            {
+              filename: "invoice.pdf",
+              path: invoicePath
+            }
+          ]
+        : []
     );
 
-    res.json({ message: "Purchased successfully", purchase });
+    /* DELETE TEMP INVOICE */
+    if (invoicePath && fs.existsSync(invoicePath)) {
+      fs.unlinkSync(invoicePath);
+    }
+
+    res.json({
+      message: "Membership processed successfully",
+      purchase
+    });
 
   } catch (err) {
     console.error("PURCHASE ERROR:", err);
@@ -74,7 +167,10 @@ exports.purchaseMembership = async (req, res) => {
   }
 };
 
-/*===============MEMBERSHIP PURCHASES=============*/
+
+/* =========================================
+   GET MEMBERSHIP PURCHASES (ADMIN)
+========================================= */
 exports.getMembershipPurchases = async (req, res) => {
   try {
     const purchases = await MembershipPurchase.findAll({
@@ -89,11 +185,13 @@ exports.getMembershipPurchases = async (req, res) => {
     });
 
     res.json(purchases);
+
   } catch (err) {
     console.error("GET PURCHASES ERROR:", err);
     res.status(500).json({ message: "Failed to load purchases" });
   }
 };
+
 
 /* =========================================
    APPROVE PURCHASE
@@ -101,11 +199,46 @@ exports.getMembershipPurchases = async (req, res) => {
 exports.approvePurchase = async (req, res) => {
   try {
     const purchase = await MembershipPurchase.findByPk(req.params.id, {
-      include: [User, Membership],
+      include: [
+        User,
+        {
+          model: Membership,
+          include: [
+            {
+              model: Product,
+              attributes: ["businessId"]
+            }
+          ]
+        }
+      ],
     });
 
     purchase.status = "approved";
     await purchase.save();
+
+    /* ADD USER TO COMMUNITY */
+    const businessId = purchase.Membership.Product.businessId;
+
+    const community = await Community.findOne({
+      where: { businessId }
+    });
+
+    if (community) {
+      const existingMember = await CommunityMember.findOne({
+        where: {
+          communityId: community.id,
+          userId: purchase.userId
+        }
+      });
+
+      if (!existingMember) {
+        await CommunityMember.create({
+          communityId: community.id,
+          userId: purchase.userId,
+          role: "member"
+        });
+      }
+    }
 
     const html = emailLayout(
       "Membership Approved",
@@ -164,6 +297,7 @@ exports.rejectPurchase = async (req, res) => {
   }
 };
 
+
 /* =========================================
    GET MY ACTIVE MEMBERSHIP
 ========================================= */
@@ -201,10 +335,7 @@ exports.getMyActiveMembership = async (req, res) => {
     });
 
   } catch (err) {
-
     console.error("ACTIVE MEMBERSHIP ERROR:", err);
-
     res.status(500).json({ message: "Failed" });
-
   }
 };
