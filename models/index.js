@@ -174,6 +174,7 @@ User.hasMany(CommunityMessage, {
 
 CommunityMessage.belongsTo(User, {
   foreignKey: "userId",
+  as: "Sender",
 });
 
 /* ================= COURSE ================= */
